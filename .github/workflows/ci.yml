@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10.x
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Restore
+        run: dotnet restore InvoiceFlow.slnx
+
+      - name: Build
+        run: dotnet build InvoiceFlow.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test InvoiceFlow.slnx --configuration Release --no-build
+
+      - name: Publish Web application
+        run: dotnet publish src/InvoiceFlow.Web/InvoiceFlow.Web.csproj --configuration Release --no-build --output ./artifacts/publish
+
+      - name: Upload published Web application
+        uses: actions/upload-artifact@v4
+        with:
+          name: invoiceflow-web
+          path: ./artifacts/publish
+          retention-days: 7
+          if-no-files-found: error
