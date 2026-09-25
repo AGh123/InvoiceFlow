@@ -1,0 +1,51 @@
+<div class="@CssClass" role="@Role" aria-live="@LiveSetting">
+    <img class="status-icon" src="@IconPath" alt="" aria-hidden="true" />
+
+    <div class="status-copy">
+        <p class="status-title">@Message</p>
+        @if (!string.IsNullOrWhiteSpace(Detail))
+        {
+            <p class="status-detail">@Detail</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(ActionText) && OnAction.HasDelegate)
+        {
+            <button type="button" class="status-action" @onclick="OnAction">@ActionText</button>
+        }
+    </div>
+
+    @if (OnDismiss.HasDelegate)
+    {
+        <button type="button" class="dismiss-button" aria-label="Dismiss notification" @onclick="OnDismiss">
+            <img src="assets/icons/close.svg" alt="" aria-hidden="true" />
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Detail { get; set; }
+
+    [Parameter]
+    public string Kind { get; set; } = "success";
+
+    [Parameter]
+    public bool Floating { get; set; }
+
+    [Parameter]
+    public string? ActionText { get; set; }
+
+    [Parameter]
+    public EventCallback OnAction { get; set; }
+
+    [Parameter]
+    public EventCallback OnDismiss { get; set; }
+
+    private bool IsError => string.Equals(Kind, "error", StringComparison.OrdinalIgnoreCase);
+    private string CssClass => $"status-message status-{(IsError ? "error" : "success")}{(Floating ? " status-floating" : string.Empty)}";
+    private string IconPath => IsError ? "assets/icons/alert-circle.svg" : "assets/icons/check-circle.svg";
+    private string Role => IsError ? "alert" : "status";
+    private string LiveSetting => IsError ? "assertive" : "polite";
+}

@@ -1,0 +1,15 @@
+@page "/invoices/new"
+@page "/invoices/{Id:guid}"
+
+<PageTitle>Invoice editor · InvoiceFlow</PageTitle>
+
+<section class="route-reservation">
+    <h1>Invoice editor</h1>
+    <p>The invoice editor will be available in the next milestone.</p>
+    <a class="button button-secondary" href="/invoices">Back to invoices</a>
+</section>
+
+@code {
+    [Parameter]
+    public Guid? Id { get; set; }
+}

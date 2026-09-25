@@ -1,0 +1,106 @@
+@page "/invoices"
+@implements IDisposable
+@inject InvoiceFlow.Application.Invoices.InvoiceService InvoiceService
+@inject ILogger<InvoiceListPage> Logger
+
+<PageTitle>Invoices · InvoiceFlow</PageTitle>
+
+<section class="@PageClass">
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <StatusMessage Message="@_successMessage"
+                       Floating="true"
+                       OnDismiss="DismissSuccess" />
+    }
+
+    <header class="page-title-row">
+        <div class="title-group">
+            <h1>Invoices</h1>
+            <p>Create, manage and review your invoices.</p>
+        </div>
+
+        @if (!_isLoading && _loadError is null && _invoices.Count > 0)
+        {
+            <a class="button button-primary new-invoice-button" href="/invoices/new">
+                <picture aria-hidden="true">
+                    <source media="(max-width: 48rem)" srcset="assets/icons/plus-mobile.svg" />
+                    <img src="assets/icons/plus-desktop.svg" alt="" />
+                </picture>
+                New Invoice
+            </a>
+        }
+    </header>
+
+    @if (_isLoading)
+    {
+        <div class="loading-state" role="status" aria-live="polite">
+            <span class="loading-spinner" aria-hidden="true"></span>
+            <p>Loading invoices…</p>
+        </div>
+    }
+    else if (_loadError is not null)
+    {
+        <StatusMessage Kind="error"
+                       Message="We couldn't load your invoices."
+                       Detail="Something went wrong while loading your invoices. Try again."
+                       ActionText="Try Again"
+                       OnAction="LoadInvoicesAsync" />
+    }
+    else
+    {
+        <InvoiceList Invoices="_invoices" InvoiceDeleted="HandleInvoiceDeleted" />
+    }
+</section>
+
+@code {
+    private readonly CancellationTokenSource _cancellationTokenSource = new();
+    private readonly List<InvoiceSummaryDto> _invoices = [];
+    private bool _isLoading = true;
+    private string? _loadError;
+    private string? _successMessage;
+
+    private string PageClass =>
+        $"invoice-page{(!_isLoading && _loadError is null && _invoices.Count == 0 ? " invoice-page-empty" : string.Empty)}";
+
+    protected override async Task OnInitializedAsync() => await LoadInvoicesAsync();
+
+    private async Task LoadInvoicesAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            var invoices = await InvoiceService.GetInvoicesAsync(_cancellationTokenSource.Token);
+            _invoices.Clear();
+            _invoices.AddRange(invoices);
+        }
+        catch (OperationCanceledException) when (_cancellationTokenSource.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to load invoices.");
+            _loadError = "load-failed";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void HandleInvoiceDeleted(InvoiceSummaryDto invoice)
+    {
+        _invoices.RemoveAll(existing => existing.Id == invoice.Id);
+        _successMessage = $"Invoice {invoice.InvoiceNumber} deleted successfully";
+    }
+
+    private void DismissSuccess() => _successMessage = null;
+
+    public void Dispose()
+    {
+        _cancellationTokenSource.Cancel();
+        _cancellationTokenSource.Dispose();
+    }
+}

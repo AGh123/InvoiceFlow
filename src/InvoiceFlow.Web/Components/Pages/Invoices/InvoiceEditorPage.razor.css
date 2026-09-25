@@ -1,0 +1,28 @@
+.route-reservation {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin: 0 auto;
+    max-width: var(--content-max-width);
+    padding: var(--space-10) 0;
+    width: calc(100% - 5rem);
+}
+
+.route-reservation h1 {
+    font-size: 1.75rem;
+}
+
+.route-reservation p {
+    color: var(--color-text-muted);
+}
+
+.route-reservation .button {
+    align-self: flex-start;
+}
+
+@media (max-width: 48rem) {
+    .route-reservation {
+        padding: var(--space-4) 0;
+        width: calc(100% - 2rem);
+    }
+}

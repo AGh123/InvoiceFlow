@@ -1,0 +1,306 @@
+@using System.Globalization
+
+@if (Invoices.Count == 0)
+{
+    <EmptyState Title="No invoices yet"
+                Description="Create your first invoice to start managing your billing."
+                ActionText="Create Invoice"
+                ActionHref="/invoices/new" />
+}
+else
+{
+    var displayedInvoices = GetDisplayedInvoices();
+    var pageCount = GetPageCount(displayedInvoices.Count);
+    var currentPage = Math.Clamp(_currentPage, 1, pageCount);
+    var pageInvoices = displayedInvoices
+        .Skip((currentPage - 1) * PageSize)
+        .Take(PageSize)
+        .ToArray();
+    var firstItem = displayedInvoices.Count == 0 ? 0 : ((currentPage - 1) * PageSize) + 1;
+    var lastItem = displayedInvoices.Count == 0 ? 0 : firstItem + pageInvoices.Length - 1;
+    var latestInvoice = GetLatestInvoice();
+
+    <section class="summary-grid" aria-label="Invoice summary">
+        <article class="summary-card">
+            <div class="summary-label">
+                <picture aria-hidden="true">
+                    <source media="(max-width: 48rem)" srcset="assets/icons/total-invoices-mobile.svg" />
+                    <img src="assets/icons/total-invoices-desktop.svg" alt="" />
+                </picture>
+                <span>Total Invoices</span>
+            </div>
+            <p class="summary-value">@Invoices.Count</p>
+        </article>
+
+        <article class="summary-card">
+            <div class="summary-label">
+                <picture aria-hidden="true">
+                    <source media="(max-width: 48rem)" srcset="assets/icons/latest-invoice-mobile.svg" />
+                    <img src="assets/icons/latest-invoice-desktop.svg" alt="" />
+                </picture>
+                <span>Latest Invoice</span>
+            </div>
+            <p class="summary-value summary-date">@FormatDate(latestInvoice!.IssueDate)</p>
+        </article>
+    </section>
+
+    <section class="invoice-collection" aria-label="Invoices">
+        <div class="controls-bar">
+            <div class="search-control">
+                <label class="visually-hidden" for="invoice-search">Search invoices</label>
+                <picture aria-hidden="true">
+                    <source media="(max-width: 48rem)" srcset="assets/icons/search-mobile.svg" />
+                    <img src="assets/icons/search-desktop.svg" alt="" />
+                </picture>
+                <input id="invoice-search"
+                       type="search"
+                       placeholder="Search invoices…"
+                       autocomplete="off"
+                       @bind="SearchTerm"
+                       @bind:event="oninput" />
+            </div>
+
+            <div class="sort-control">
+                <label for="invoice-sort">Sort by:</label>
+                <div class="select-wrapper">
+                    <select id="invoice-sort" @bind="SortOption">
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                        <option value="customer">Customer A–Z</option>
+                        <option value="number">Invoice number</option>
+                    </select>
+                    <picture aria-hidden="true">
+                        <source media="(max-width: 48rem)" srcset="assets/icons/chevron-down-mobile.svg" />
+                        <img src="assets/icons/chevron-down-desktop.svg" alt="" />
+                    </picture>
+                </div>
+            </div>
+        </div>
+
+        @if (displayedInvoices.Count == 0)
+        {
+            <div class="no-results">
+                <EmptyState Title="No invoices found"
+                            Description="Try a different invoice number or customer name." />
+            </div>
+        }
+        else
+        {
+            <div class="desktop-list">
+                <table>
+                    <caption class="visually-hidden">Invoices matching the current search and sort</caption>
+                    <colgroup>
+                        <col class="invoice-number-column" />
+                        <col class="customer-column" />
+                        <col class="date-column" />
+                        <col class="amount-column" />
+                        <col class="actions-column" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th scope="col">Invoice Number</th>
+                            <th scope="col">Customer</th>
+                            <th scope="col">Issue Date</th>
+                            <th scope="col" class="numeric-cell">Amount</th>
+                            <th scope="col" class="numeric-cell">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var invoice in pageInvoices)
+                        {
+                            <tr @key="invoice.Id">
+                                <td><a class="invoice-link" href="@InvoiceHref(invoice)">@invoice.InvoiceNumber</a></td>
+                                <td class="customer-cell">@invoice.CustomerName</td>
+                                <td class="muted-cell">@FormatDate(invoice.IssueDate)</td>
+                                <td class="amount-cell">@FormatAmount(invoice)</td>
+                                <td class="actions-cell">@Actions(invoice)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <ul class="mobile-list" aria-label="Invoices matching the current search and sort">
+                @foreach (var invoice in pageInvoices)
+                {
+                    <li class="invoice-card" @key="invoice.Id">
+                        <div class="card-header">
+                            <a class="invoice-link" href="@InvoiceHref(invoice)">@invoice.InvoiceNumber</a>
+                            @Actions(invoice)
+                        </div>
+                        <p class="card-customer">@invoice.CustomerName</p>
+                        <div class="card-meta">
+                            <time datetime="@invoice.IssueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">
+                                @FormatDate(invoice.IssueDate)
+                            </time>
+                            <span class="card-amount">@FormatAmount(invoice)</span>
+                        </div>
+                    </li>
+                }
+            </ul>
+
+            <nav class="pagination" aria-label="Invoice list pagination">
+                <p>Showing @firstItem–@lastItem of @displayedInvoices.Count invoices</p>
+                <div class="pagination-buttons">
+                    <button type="button"
+                            class="button button-secondary"
+                            disabled="@(currentPage == 1)"
+                            @onclick="PreviousPage">
+                        Previous
+                    </button>
+                    <button type="button"
+                            class="button button-secondary"
+                            disabled="@(currentPage == pageCount)"
+                            @onclick="NextPage">
+                        Next
+                    </button>
+                </div>
+            </nav>
+        }
+    </section>
+}
+
+<InvoiceDeleteDialog @ref="_deleteDialog" InvoiceDeleted="HandleInvoiceDeletedAsync" />
+
+@code {
+    private const int PageSize = 10;
+    private InvoiceDeleteDialog? _deleteDialog;
+    private string _searchTerm = string.Empty;
+    private string _sortOption = "newest";
+    private int _currentPage = 1;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<InvoiceSummaryDto> Invoices { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<InvoiceSummaryDto> InvoiceDeleted { get; set; }
+
+    private string SearchTerm
+    {
+        get => _searchTerm;
+        set
+        {
+            if (string.Equals(_searchTerm, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _searchTerm = value;
+            _currentPage = 1;
+        }
+    }
+
+    private string SortOption
+    {
+        get => _sortOption;
+        set
+        {
+            if (string.Equals(_sortOption, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _sortOption = value;
+            _currentPage = 1;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        var pageCount = GetPageCount(GetDisplayedInvoices().Count);
+        _currentPage = Math.Clamp(_currentPage, 1, pageCount);
+    }
+
+    private IReadOnlyList<InvoiceSummaryDto> GetDisplayedInvoices()
+    {
+        var query = Invoices.AsEnumerable();
+        var normalizedSearch = _searchTerm.Trim();
+
+        if (normalizedSearch.Length > 0)
+        {
+            query = query.Where(invoice =>
+                invoice.InvoiceNumber.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase) ||
+                invoice.CustomerName.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase));
+        }
+
+        query = _sortOption switch
+        {
+            "oldest" => query
+                .OrderBy(invoice => invoice.IssueDate)
+                .ThenBy(invoice => invoice.InvoiceNumber, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(invoice => invoice.Id),
+            "customer" => query
+                .OrderBy(invoice => invoice.CustomerName, StringComparer.OrdinalIgnoreCase)
+                .ThenByDescending(invoice => invoice.IssueDate)
+                .ThenBy(invoice => invoice.InvoiceNumber, StringComparer.OrdinalIgnoreCase),
+            "number" => query
+                .OrderBy(invoice => invoice.InvoiceNumber, StringComparer.OrdinalIgnoreCase)
+                .ThenByDescending(invoice => invoice.IssueDate)
+                .ThenBy(invoice => invoice.Id),
+            _ => query
+                .OrderByDescending(invoice => invoice.IssueDate)
+                .ThenBy(invoice => invoice.InvoiceNumber, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(invoice => invoice.Id),
+        };
+
+        return query.ToArray();
+    }
+
+    private InvoiceSummaryDto? GetLatestInvoice() =>
+        Invoices
+            .OrderByDescending(invoice => invoice.IssueDate)
+            .ThenBy(invoice => invoice.InvoiceNumber, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+
+    private static int GetPageCount(int itemCount) => Math.Max(1, (int)Math.Ceiling(itemCount / (double)PageSize));
+
+    private static string FormatDate(DateOnly date) =>
+        date.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
+
+    private static string FormatAmount(InvoiceSummaryDto invoice) =>
+        $"{invoice.CurrencyCode} {invoice.GrandTotal.ToString("N2", CultureInfo.InvariantCulture)}";
+
+    private static string InvoiceHref(InvoiceSummaryDto invoice) => $"/invoices/{invoice.Id}";
+
+    private RenderFragment Actions(InvoiceSummaryDto invoice) => @<text>
+        <details class="row-actions">
+            <summary aria-label="@($"Actions for invoice {invoice.InvoiceNumber}")">
+                <img class="actions-icon"
+                     src="assets/icons/more-ellipsis.svg"
+                     alt=""
+                     aria-hidden="true" />
+            </summary>
+            <div class="actions-popover">
+                <a href="@InvoiceHref(invoice)">Open invoice</a>
+                <button type="button" @onclick="() => ShowDeleteDialogAsync(invoice)">Delete</button>
+            </div>
+        </details>
+    </text>;
+
+    private Task ShowDeleteDialogAsync(InvoiceSummaryDto invoice) =>
+        _deleteDialog?.ShowAsync(invoice) ?? Task.CompletedTask;
+
+    private async Task HandleInvoiceDeletedAsync(InvoiceSummaryDto invoice)
+    {
+        await InvoiceDeleted.InvokeAsync(invoice);
+        var pageCount = GetPageCount(GetDisplayedInvoices().Count);
+        _currentPage = Math.Clamp(_currentPage, 1, pageCount);
+    }
+
+    private void PreviousPage()
+    {
+        if (_currentPage > 1)
+        {
+            _currentPage--;
+        }
+    }
+
+    private void NextPage()
+    {
+        var pageCount = GetPageCount(GetDisplayedInvoices().Count);
+        if (_currentPage < pageCount)
+        {
+            _currentPage++;
+        }
+    }
+}

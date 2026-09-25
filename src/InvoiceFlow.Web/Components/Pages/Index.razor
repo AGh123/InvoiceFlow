@@ -1,0 +1,9 @@
+@page "/"
+@inject NavigationManager Navigation
+
+<PageTitle>InvoiceFlow</PageTitle>
+
+@code {
+    protected override void OnInitialized() =>
+        Navigation.NavigateTo("/invoices", replace: true);
+}
