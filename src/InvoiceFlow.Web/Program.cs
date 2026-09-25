@@ -1,20 +1,31 @@
+using InvoiceFlow.Application.Invoices;
+using InvoiceFlow.Infrastructure;
+using InvoiceFlow.Infrastructure.Persistence;
 using InvoiceFlow.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+var databasePath = Path.Combine(
+    builder.Environment.ContentRootPath,
+    "App_Data",
+    "invoiceflow.db");
+
+builder.Services.AddInfrastructure(databasePath);
+builder.Services.AddScoped<InvoiceService>();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+await app.Services.ApplyDatabaseMigrationsAsync();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
