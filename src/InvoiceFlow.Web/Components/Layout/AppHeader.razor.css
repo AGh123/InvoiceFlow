@@ -51,6 +51,7 @@
 
     .brand {
         font-size: 0.875rem;
+        min-height: 2.75rem;
     }
 
     .brand-mark {

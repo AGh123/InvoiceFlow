@@ -90,7 +90,7 @@ h1:focus {
 }
 
 .button-danger {
-    background: var(--color-danger);
+    background: var(--color-danger-text);
     color: var(--color-surface);
 }
 

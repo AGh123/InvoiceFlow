@@ -80,3 +80,9 @@
         width: calc(100% - 2.5rem);
     }
 }
+
+@media (max-width: 22rem) {
+    .dialog-actions .button {
+        padding-inline: var(--space-2);
+    }
+}

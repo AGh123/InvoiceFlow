@@ -64,6 +64,7 @@
                         <InputText id="@($"{idPrefix}-description")"
                                    maxlength="500"
                                    autocomplete="off"
+                                   disabled="@Disabled"
                                    aria-describedby="@($"{idPrefix}-description-error")"
                                    placeholder="Enter description…"
                                    @bind-Value="lineItem.Description" />
@@ -77,6 +78,7 @@
                                             id="@($"{idPrefix}-quantity")"
                                             step="any"
                                             inputmode="decimal"
+                                            disabled="@Disabled"
                                             aria-describedby="@($"{idPrefix}-quantity-error")"
                                             @bind-Value="lineItem.Quantity" />
                         <ValidationMessage id="@($"{idPrefix}-quantity-error")"
@@ -90,6 +92,7 @@
                                             min="0"
                                             step="any"
                                             inputmode="decimal"
+                                            disabled="@Disabled"
                                             aria-describedby="@($"{idPrefix}-price-error")"
                                             @bind-Value="lineItem.UnitPrice" />
                         <ValidationMessage id="@($"{idPrefix}-price-error")"
@@ -104,6 +107,7 @@
                                             max="100"
                                             step="any"
                                             inputmode="decimal"
+                                            disabled="@Disabled"
                                             aria-describedby="@($"{idPrefix}-discount-error")"
                                             @bind-Value="lineItem.DiscountPercent" />
                         <ValidationMessage id="@($"{idPrefix}-discount-error")"

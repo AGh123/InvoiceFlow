@@ -69,7 +69,13 @@ else if (_model is not null)
     [Parameter]
     public Guid? Id { get; set; }
 
-    private string PageTitleText => Id.HasValue ? "Edit Invoice" : "New Invoice";
+    private string PageTitleText => (_notFound, _loadError, Id.HasValue) switch
+    {
+        (true, _, _) => "Invoice Not Found",
+        (_, true, _) => "Invoice Load Error",
+        (_, _, true) => "Edit Invoice",
+        _ => "New Invoice",
+    };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -138,6 +144,8 @@ else if (_model is not null)
 
         _isSaving = true;
         _saveError = null;
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
 
         try
         {

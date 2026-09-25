@@ -82,6 +82,7 @@
     border: 0;
     color: var(--color-text);
     font-size: 0.875rem;
+    height: 100%;
     min-width: 0;
     outline: 0;
     padding: 0;
@@ -430,7 +431,10 @@ tbody tr:hover {
     }
 
     .card-header .invoice-link {
+        align-items: center;
+        display: flex;
         font-size: 0.875rem;
+        min-height: 2.75rem;
         min-width: 0;
         overflow-wrap: anywhere;
     }

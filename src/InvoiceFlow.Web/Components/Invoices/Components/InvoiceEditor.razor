@@ -3,7 +3,7 @@
 <EditForm EditContext="_editContext"
           FormName="invoice-editor"
           @key="_editContext"
-          aria-busy="@IsSaving"
+          aria-busy="@IsSaving.ToString().ToLowerInvariant()"
           novalidate
           OnSubmit="HandleSubmitAsync">
     <DataAnnotationsValidator />
@@ -78,6 +78,7 @@
                     <InputText id="invoice-number"
                                maxlength="50"
                                autocomplete="off"
+                               disabled="@IsSaving"
                                aria-describedby="invoice-number-error"
                                @oninput="HandleInvoiceNumberInput"
                                @bind-Value="Model.InvoiceNumber" />
@@ -90,6 +91,7 @@
                     <InputText id="customer-name"
                                maxlength="200"
                                autocomplete="organization"
+                               disabled="@IsSaving"
                                placeholder="Enter customer name"
                                aria-describedby="customer-name-error"
                                @bind-Value="Model.CustomerName" />
@@ -102,6 +104,7 @@
                     <div class="input-with-icon date-input">
                         <InputDate id="issue-date"
                                    TValue="DateOnly"
+                                   disabled="@IsSaving"
                                    aria-describedby="issue-date-error"
                                    @bind-Value="Model.IssueDate" />
                         <picture aria-hidden="true">
@@ -120,6 +123,7 @@
                                    maxlength="3"
                                    list="currency-options"
                                    autocomplete="off"
+                                   disabled="@IsSaving"
                                    placeholder="USD"
                                    aria-describedby="currency-code-error currency-code-help"
                                    @bind-Value="Model.CurrencyCode" />

@@ -109,6 +109,12 @@
     border-color: var(--color-danger);
 }
 
+.line-field ::deep input:disabled {
+    background: var(--color-background);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+}
+
 .line-field ::deep .validation-message {
     font-size: 0.6875rem;
     line-height: 1.35;
@@ -138,7 +144,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius-icon);
-    color: var(--color-danger);
+    color: var(--color-danger-text);
     display: inline-flex;
     font-size: 0.75rem;
     gap: var(--space-1);
@@ -222,7 +228,7 @@
     }
 
     .add-item-button {
-        min-height: 2rem;
+        min-height: 2.75rem;
         padding: 0.375rem 0.625rem;
     }
 
@@ -276,7 +282,11 @@
 
     .line-field ::deep input {
         font-size: 0.8125rem;
-        height: 2.5rem;
+        height: 2.75rem;
+    }
+
+    .empty-add-button {
+        min-height: 2.75rem;
     }
 
     .line-total {
