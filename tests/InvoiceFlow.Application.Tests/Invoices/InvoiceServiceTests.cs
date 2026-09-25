@@ -1,0 +1,498 @@
+using InvoiceFlow.Application.Invoices;
+using InvoiceFlow.Application.Invoices.Requests;
+using InvoiceFlow.Application.Tests.Fakes;
+using InvoiceFlow.Domain.Invoices;
+
+namespace InvoiceFlow.Application.Tests.Invoices;
+
+public class InvoiceServiceTests
+{
+    private static readonly DateOnly DefaultIssueDate = new(2026, 9, 25);
+
+    [Fact]
+    public async Task GetInvoicesAsync_MapsInvoicesToSummaries()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var firstInvoice = CreateInvoice("INV-001", "Acme Ltd", "USD");
+        var secondInvoice = CreateInvoice("INV-002", "Globex Corp", "EUR");
+        repository.Seed(firstInvoice);
+        repository.Seed(secondInvoice);
+        var service = new InvoiceService(repository);
+
+        // Act
+        var summaries = await service.GetInvoicesAsync();
+
+        // Assert
+        Assert.Collection(
+            summaries,
+            summary =>
+            {
+                Assert.Equal(firstInvoice.Id, summary.Id);
+                Assert.Equal("INV-001", summary.InvoiceNumber);
+                Assert.Equal("Acme Ltd", summary.CustomerName);
+                Assert.Equal(DefaultIssueDate, summary.IssueDate);
+                Assert.Equal("USD", summary.CurrencyCode);
+            },
+            summary =>
+            {
+                Assert.Equal(secondInvoice.Id, summary.Id);
+                Assert.Equal("INV-002", summary.InvoiceNumber);
+                Assert.Equal("Globex Corp", summary.CustomerName);
+                Assert.Equal(DefaultIssueDate, summary.IssueDate);
+                Assert.Equal("EUR", summary.CurrencyCode);
+            });
+    }
+
+    [Fact]
+    public async Task GetInvoicesAsync_ReturnsCalculatedGrandTotals()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        invoice.AddLineItem(Guid.NewGuid(), "Consulting", 5m, 100m, 10m);
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+
+        // Act
+        var summaries = await service.GetInvoicesAsync();
+
+        // Assert
+        var summary = Assert.Single(summaries);
+        Assert.Equal(450m, summary.GrandTotal);
+    }
+
+    [Fact]
+    public async Task GetInvoiceAsync_WithExistingInvoice_MapsDetailsAndCalculations()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        var lineItem = invoice.AddLineItem(Guid.NewGuid(), "Consulting", 5m, 100m, 10m);
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+
+        // Act
+        var details = await service.GetInvoiceAsync(invoice.Id);
+
+        // Assert
+        Assert.NotNull(details);
+        Assert.Equal(invoice.Id, details.Id);
+        Assert.Equal("INV-001", details.InvoiceNumber);
+        Assert.Equal("Acme Ltd", details.CustomerName);
+        Assert.Equal(DefaultIssueDate, details.IssueDate);
+        Assert.Equal("USD", details.CurrencyCode);
+        Assert.Equal(500m, details.Subtotal);
+        Assert.Equal(50m, details.TotalDiscount);
+        Assert.Equal(450m, details.GrandTotal);
+
+        var lineItemDto = Assert.Single(details.LineItems);
+        Assert.Equal(lineItem.Id, lineItemDto.Id);
+        Assert.Equal("Consulting", lineItemDto.Description);
+        Assert.Equal(5m, lineItemDto.Quantity);
+        Assert.Equal(100m, lineItemDto.UnitPrice);
+        Assert.Equal(10m, lineItemDto.DiscountPercent);
+        Assert.Equal(500m, lineItemDto.GrossAmount);
+        Assert.Equal(50m, lineItemDto.DiscountAmount);
+        Assert.Equal(450m, lineItemDto.LineTotal);
+    }
+
+    [Fact]
+    public async Task GetInvoiceAsync_WithMissingInvoice_ReturnsNull()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+
+        // Act
+        var details = await service.GetInvoiceAsync(Guid.NewGuid());
+
+        // Assert
+        Assert.Null(details);
+    }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_GeneratesNonEmptyInvoiceId()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+
+        // Act
+        var details = await service.CreateInvoiceAsync(CreateRequest());
+
+        // Assert
+        Assert.NotEqual(Guid.Empty, details.Id);
+    }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_GeneratesAndAssociatesLineItemIds()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+        var request = CreateRequest(
+            new InvoiceLineItemInput(null, "Consulting", 2m, 100m, 10m),
+            new InvoiceLineItemInput(null, "Support", 1m, 50m, 0m));
+
+        // Act
+        var details = await service.CreateInvoiceAsync(request);
+
+        // Assert
+        Assert.All(details.LineItems, lineItem => Assert.NotEqual(Guid.Empty, lineItem.Id));
+        Assert.Equal(2, details.LineItems.Select(lineItem => lineItem.Id).Distinct().Count());
+
+        var storedInvoice = Assert.Single(repository.Invoices);
+        Assert.All(storedInvoice.LineItems, lineItem => Assert.Equal(details.Id, lineItem.InvoiceId));
+    }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_PersistsThroughRepository()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+
+        // Act
+        var details = await service.CreateInvoiceAsync(CreateRequest());
+
+        // Assert
+        Assert.Equal(1, repository.AddCallCount);
+        var storedInvoice = Assert.Single(repository.Invoices);
+        Assert.Equal(details.Id, storedInvoice.Id);
+    }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_ReturnsCalculatedDetails()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+        var request = CreateRequest(
+            new InvoiceLineItemInput(null, "Consulting", 5m, 100m, 10m),
+            new InvoiceLineItemInput(null, "Support", 2m, 75m, 20m));
+
+        // Act
+        var details = await service.CreateInvoiceAsync(request);
+
+        // Assert
+        Assert.Equal(650m, details.Subtotal);
+        Assert.Equal(80m, details.TotalDiscount);
+        Assert.Equal(570m, details.GrandTotal);
+    }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_WithInvalidDomainInput_ThrowsWithoutPersisting()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+        var request = CreateRequest(
+            new InvoiceLineItemInput(null, "Consulting", 1m, 100m, 0m),
+            new InvoiceLineItemInput(null, "Invalid", 0m, 50m, 0m));
+
+        // Act
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            service.CreateInvoiceAsync(request));
+
+        // Assert
+        Assert.Equal(0, repository.AddCallCount);
+        Assert.Empty(repository.Invoices);
+    }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_WithSuppliedLineItemId_ThrowsWithoutPersisting()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+        var request = CreateRequest(
+            new InvoiceLineItemInput(Guid.NewGuid(), "Consulting", 1m, 100m, 0m));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.CreateInvoiceAsync(request));
+
+        // Assert
+        Assert.Equal("request", exception.ParamName);
+        Assert.Contains(
+            "Line item IDs must not be supplied when creating an invoice.",
+            exception.Message);
+        Assert.Equal(0, repository.AddCallCount);
+        Assert.Empty(repository.Invoices);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_UpdatesInvoiceDetails()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var request = new UpdateInvoiceRequest(
+            "INV-UPDATED",
+            "Globex Corp",
+            new DateOnly(2027, 1, 15),
+            "eur",
+            []);
+
+        // Act
+        var updated = await service.UpdateInvoiceAsync(invoice.Id, request);
+
+        // Assert
+        Assert.True(updated);
+        Assert.Equal("INV-UPDATED", invoice.InvoiceNumber);
+        Assert.Equal("Globex Corp", invoice.CustomerName);
+        Assert.Equal(new DateOnly(2027, 1, 15), invoice.IssueDate);
+        Assert.Equal("EUR", invoice.CurrencyCode);
+        Assert.Equal(1, repository.UpdateCallCount);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_UpdatesExistingLineItems()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        var lineItem = invoice.AddLineItem(Guid.NewGuid(), "Consulting", 1m, 100m, 0m);
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var request = UpdateRequest(
+            new InvoiceLineItemInput(lineItem.Id, "Premium consulting", 2m, 125m, 10m));
+
+        // Act
+        var updated = await service.UpdateInvoiceAsync(invoice.Id, request);
+
+        // Assert
+        Assert.True(updated);
+        var updatedLineItem = Assert.Single(invoice.LineItems);
+        Assert.Equal("Premium consulting", updatedLineItem.Description);
+        Assert.Equal(2m, updatedLineItem.Quantity);
+        Assert.Equal(125m, updatedLineItem.UnitPrice);
+        Assert.Equal(10m, updatedLineItem.DiscountPercent);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_AddsNewLineItems()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var request = UpdateRequest(
+            new InvoiceLineItemInput(null, "Support", 2m, 50m, 0m));
+
+        // Act
+        var updated = await service.UpdateInvoiceAsync(invoice.Id, request);
+
+        // Assert
+        Assert.True(updated);
+        var addedLineItem = Assert.Single(invoice.LineItems);
+        Assert.Equal("Support", addedLineItem.Description);
+        Assert.Equal(invoice.Id, addedLineItem.InvoiceId);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_RemovesOmittedLineItems()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        var retained = invoice.AddLineItem(Guid.NewGuid(), "Consulting", 1m, 100m, 0m);
+        var omitted = invoice.AddLineItem(Guid.NewGuid(), "Support", 1m, 50m, 0m);
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var request = UpdateRequest(
+            new InvoiceLineItemInput(retained.Id, "Consulting", 1m, 100m, 0m));
+
+        // Act
+        var updated = await service.UpdateInvoiceAsync(invoice.Id, request);
+
+        // Assert
+        Assert.True(updated);
+        var remainingLineItem = Assert.Single(invoice.LineItems);
+        Assert.Equal(retained.Id, remainingLineItem.Id);
+        Assert.DoesNotContain(invoice.LineItems, lineItem => lineItem.Id == omitted.Id);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_PreservesExistingLineItemIds()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        var lineItem = invoice.AddLineItem(Guid.NewGuid(), "Consulting", 1m, 100m, 0m);
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var request = UpdateRequest(
+            new InvoiceLineItemInput(lineItem.Id, "Updated", 3m, 75m, 5m));
+
+        // Act
+        await service.UpdateInvoiceAsync(invoice.Id, request);
+
+        // Assert
+        Assert.Equal(lineItem.Id, Assert.Single(invoice.LineItems).Id);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_GeneratesIdsForNewLineItems()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var request = UpdateRequest(
+            new InvoiceLineItemInput(null, "Support", 1m, 50m, 0m));
+
+        // Act
+        await service.UpdateInvoiceAsync(invoice.Id, request);
+
+        // Assert
+        Assert.NotEqual(Guid.Empty, Assert.Single(invoice.LineItems).Id);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_WithForeignLineItemId_ThrowsWithoutPersisting()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var request = UpdateRequest(
+            new InvoiceLineItemInput(Guid.NewGuid(), "Support", 1m, 50m, 0m));
+
+        // Act
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.UpdateInvoiceAsync(invoice.Id, request));
+
+        // Assert
+        Assert.Equal(0, repository.UpdateCallCount);
+        Assert.Empty(invoice.LineItems);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_WithDuplicateLineItemIds_ThrowsWithoutPersisting()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        var lineItem = invoice.AddLineItem(Guid.NewGuid(), "Consulting", 1m, 100m, 0m);
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var request = UpdateRequest(
+            new InvoiceLineItemInput(lineItem.Id, "Consulting", 1m, 100m, 0m),
+            new InvoiceLineItemInput(lineItem.Id, "Duplicate", 2m, 50m, 0m));
+
+        // Act
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.UpdateInvoiceAsync(invoice.Id, request));
+
+        // Assert
+        Assert.Equal(0, repository.UpdateCallCount);
+        Assert.Single(invoice.LineItems);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_WithInvalidRequestedState_DoesNotPersistPartialChanges()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        var lineItem = invoice.AddLineItem(Guid.NewGuid(), "Consulting", 1m, 100m, 5m);
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var request = new UpdateInvoiceRequest(
+            "INV-UPDATED",
+            "Globex Corp",
+            new DateOnly(2027, 1, 15),
+            "EUR",
+            [
+                new InvoiceLineItemInput(lineItem.Id, "Updated consulting", 2m, 125m, 10m),
+                new InvoiceLineItemInput(null, "Invalid support", 0m, 50m, 0m),
+            ]);
+
+        // Act
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            service.UpdateInvoiceAsync(invoice.Id, request));
+
+        // Assert
+        Assert.Equal(0, repository.UpdateCallCount);
+        Assert.Equal("INV-001", invoice.InvoiceNumber);
+        Assert.Equal("Acme Ltd", invoice.CustomerName);
+        Assert.Equal(DefaultIssueDate, invoice.IssueDate);
+        Assert.Equal("USD", invoice.CurrencyCode);
+
+        var unchangedLineItem = Assert.Single(invoice.LineItems);
+        Assert.Equal(lineItem.Id, unchangedLineItem.Id);
+        Assert.Equal("Consulting", unchangedLineItem.Description);
+        Assert.Equal(1m, unchangedLineItem.Quantity);
+        Assert.Equal(100m, unchangedLineItem.UnitPrice);
+        Assert.Equal(5m, unchangedLineItem.DiscountPercent);
+    }
+
+    [Fact]
+    public async Task UpdateInvoiceAsync_WithMissingInvoice_ReturnsFalse()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+
+        // Act
+        var updated = await service.UpdateInvoiceAsync(Guid.NewGuid(), UpdateRequest());
+
+        // Assert
+        Assert.False(updated);
+        Assert.Equal(0, repository.UpdateCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteInvoiceAsync_WithExistingInvoice_DeletesAndReturnsTrue()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+
+        // Act
+        var deleted = await service.DeleteInvoiceAsync(invoice.Id);
+
+        // Assert
+        Assert.True(deleted);
+        Assert.Equal(1, repository.DeleteCallCount);
+        Assert.Empty(repository.Invoices);
+    }
+
+    [Fact]
+    public async Task DeleteInvoiceAsync_WithMissingInvoice_ReturnsFalse()
+    {
+        // Arrange
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+
+        // Act
+        var deleted = await service.DeleteInvoiceAsync(Guid.NewGuid());
+
+        // Assert
+        Assert.False(deleted);
+        Assert.Equal(0, repository.DeleteCallCount);
+    }
+
+    private static Invoice CreateInvoice(
+        string invoiceNumber = "INV-001",
+        string customerName = "Acme Ltd",
+        string currencyCode = "USD") =>
+        new(Guid.NewGuid(), invoiceNumber, customerName, DefaultIssueDate, currencyCode);
+
+    private static CreateInvoiceRequest CreateRequest(
+        params InvoiceLineItemInput[] lineItems) =>
+        new("INV-001", "Acme Ltd", DefaultIssueDate, "USD", lineItems);
+
+    private static UpdateInvoiceRequest UpdateRequest(
+        params InvoiceLineItemInput[] lineItems) =>
+        new("INV-001", "Acme Ltd", DefaultIssueDate, "USD", lineItems);
+}

@@ -1,4 +1,4 @@
-namespace InvoiceFlow.Domain;
+namespace InvoiceFlow.Domain.Invoices;
 
 public class InvoiceLineItem
 {

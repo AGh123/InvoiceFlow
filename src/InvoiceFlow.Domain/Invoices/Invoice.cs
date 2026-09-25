@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 
-namespace InvoiceFlow.Domain;
+namespace InvoiceFlow.Domain.Invoices;
 
 public class Invoice
 {

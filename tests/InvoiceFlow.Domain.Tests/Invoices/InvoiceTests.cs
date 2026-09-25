@@ -1,6 +1,7 @@
 using System.Reflection;
+using InvoiceFlow.Domain.Invoices;
 
-namespace InvoiceFlow.Domain.Tests;
+namespace InvoiceFlow.Domain.Tests.Invoices;
 
 public class InvoiceTests
 {
