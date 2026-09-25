@@ -1,0 +1,54 @@
+@using System.Globalization
+
+<dl class="invoice-summary" aria-label="Invoice totals">
+    <div class="summary-row">
+        <dt>Subtotal</dt>
+        <dd>@FormatAmount(Subtotal)</dd>
+    </div>
+
+    @if (ShowDiscount)
+    {
+        <div class="summary-row discount-row">
+            <dt>Discount</dt>
+            <dd>@FormatDiscount(TotalDiscount)</dd>
+        </div>
+    }
+
+    <div class="summary-row total-row">
+        <dt>Total</dt>
+        <dd>@FormatAmount(GrandTotal)</dd>
+    </div>
+</dl>
+
+@code {
+    [Parameter]
+    public decimal Subtotal { get; set; }
+
+    [Parameter]
+    public decimal TotalDiscount { get; set; }
+
+    [Parameter]
+    public decimal GrandTotal { get; set; }
+
+    [Parameter]
+    public bool ShowDiscount { get; set; } = true;
+
+    [Parameter]
+    public string CurrencyCode { get; set; } = "USD";
+
+    private string FormatAmount(decimal amount) =>
+        $"{GetCurrencyPrefix()}{amount.ToString("N2", CultureInfo.InvariantCulture)}";
+
+    private string FormatDiscount(decimal amount) =>
+        amount == 0m ? FormatAmount(0m) : $"-{FormatAmount(amount)}";
+
+    private string GetCurrencyPrefix() => (CurrencyCode ?? string.Empty).Trim().ToUpperInvariant() switch
+    {
+        "USD" => "$",
+        "EUR" => "€",
+        "GBP" => "£",
+        "JPY" => "¥",
+        var code when code.Length == 3 => $"{code} ",
+        _ => string.Empty,
+    };
+}

@@ -1,0 +1,457 @@
+@implements IDisposable
+
+<EditForm EditContext="_editContext"
+          FormName="invoice-editor"
+          @key="_editContext"
+          aria-busy="@IsSaving"
+          novalidate
+          OnSubmit="HandleSubmitAsync">
+    <DataAnnotationsValidator />
+    <p class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+        @(IsSaving ? "Saving invoice." : string.Empty)
+    </p>
+
+    <div class="mobile-editor-bar">
+        <a class="mobile-back-link" href="/invoices">
+            <img src="assets/icons/arrow-left-mobile.svg" alt="" aria-hidden="true" />
+            Back
+        </a>
+        <button type="submit" class="button button-primary mobile-top-save" disabled="@IsSaveDisabled">
+            @SaveButtonContent()
+        </button>
+    </div>
+
+    <div class="editor-content">
+        @if (_validationErrorCount > 0)
+        {
+            <div class="validation-alert"
+                 role="alert"
+                 tabindex="-1"
+                 @ref="_validationAlert">
+                <img src="assets/icons/alert-circle.svg" alt="" aria-hidden="true" />
+                <p>@ValidationAlertText</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <StatusMessage Kind="error"
+                           Message="We couldn't save the invoice."
+                           Detail="@ErrorMessage"
+                           ActionText="Try Again"
+                           OnAction="RetrySaveAsync" />
+        }
+
+        <header class="editor-heading">
+            <div class="heading-copy">
+                <a class="desktop-back-link" href="/invoices">
+                    <img src="assets/icons/arrow-left-desktop.svg" alt="" aria-hidden="true" />
+                    Back to Invoices
+                </a>
+                <div>
+                    <h1>@(IsEditMode ? "Edit Invoice" : "New Invoice")</h1>
+                    <p>@(IsEditMode
+                        ? "Modify invoice details, customer information, or line items."
+                        : "Create a new invoice by filling out the details and items below.")</p>
+                </div>
+            </div>
+
+            <div class="desktop-actions">
+                <button type="button"
+                        class="button button-secondary"
+                        disabled="@IsSaving"
+                        @onclick="OnCancel">
+                    Cancel
+                </button>
+                <button type="submit" class="button button-primary" disabled="@IsSaveDisabled">
+                    @SaveButtonContent()
+                </button>
+            </div>
+        </header>
+
+        <section class="invoice-details-card" aria-labelledby="invoice-details-heading">
+            <h2 id="invoice-details-heading">Invoice Details</h2>
+
+            <div class="details-grid">
+                <div class="field-group invoice-number-field">
+                    <label for="invoice-number">Invoice Number</label>
+                    <InputText id="invoice-number"
+                               maxlength="50"
+                               autocomplete="off"
+                               aria-describedby="invoice-number-error"
+                               @oninput="HandleInvoiceNumberInput"
+                               @bind-Value="Model.InvoiceNumber" />
+                    <ValidationMessage id="invoice-number-error"
+                                       For="@(() => Model.InvoiceNumber)" />
+                </div>
+
+                <div class="field-group customer-field">
+                    <label for="customer-name">Customer Name</label>
+                    <InputText id="customer-name"
+                               maxlength="200"
+                               autocomplete="organization"
+                               placeholder="Enter customer name"
+                               aria-describedby="customer-name-error"
+                               @bind-Value="Model.CustomerName" />
+                    <ValidationMessage id="customer-name-error"
+                                       For="@(() => Model.CustomerName)" />
+                </div>
+
+                <div class="field-group issue-date-field">
+                    <label for="issue-date">Issue Date</label>
+                    <div class="input-with-icon date-input">
+                        <InputDate id="issue-date"
+                                   TValue="DateOnly"
+                                   aria-describedby="issue-date-error"
+                                   @bind-Value="Model.IssueDate" />
+                        <picture aria-hidden="true">
+                            <source media="(max-width: 48rem)" srcset="assets/icons/calendar-mobile.svg" />
+                            <img src="assets/icons/calendar-desktop.svg" alt="" />
+                        </picture>
+                    </div>
+                    <ValidationMessage id="issue-date-error"
+                                       For="@(() => Model.IssueDate)" />
+                </div>
+
+                <div class="field-group currency-field">
+                    <label for="currency-code">Currency</label>
+                    <div class="currency-input">
+                        <InputText id="currency-code"
+                                   maxlength="3"
+                                   list="currency-options"
+                                   autocomplete="off"
+                                   placeholder="USD"
+                                   aria-describedby="currency-code-error currency-code-help"
+                                   @bind-Value="Model.CurrencyCode" />
+                        <datalist id="currency-options">
+                            <option value="USD">US Dollar</option>
+                            <option value="EUR">Euro</option>
+                            <option value="GBP">British Pound</option>
+                            <option value="CAD">Canadian Dollar</option>
+                            <option value="AUD">Australian Dollar</option>
+                            <option value="JPY">Japanese Yen</option>
+                        </datalist>
+                    </div>
+                    <span id="currency-code-help" class="field-help">Enter any three-letter currency code.</span>
+                    <ValidationMessage id="currency-code-error"
+                                       For="@(() => Model.CurrencyCode)" />
+                </div>
+            </div>
+        </section>
+
+        <InvoiceLineItemsEditor Model="Model"
+                                Disabled="IsSaving"
+                                StructureChanged="HandleStructureChanged" />
+
+        <section class="bottom-action-bar" aria-label="Invoice actions">
+            <p>@(IsEditMode
+                ? "Review your changes before saving."
+                : "Totals update automatically as you edit line items.")</p>
+            <div class="desktop-actions">
+                <button type="button"
+                        class="button button-secondary"
+                        disabled="@IsSaving"
+                        @onclick="OnCancel">
+                    Cancel
+                </button>
+                <button type="submit" class="button button-primary" disabled="@IsSaveDisabled">
+                    @SaveButtonContent()
+                </button>
+            </div>
+            <div class="mobile-actions">
+                <button type="submit" class="button button-primary" disabled="@IsSaveDisabled">
+                    @SaveButtonContent()
+                </button>
+                <button type="button"
+                        class="mobile-cancel-button"
+                        disabled="@IsSaving"
+                        @onclick="OnCancel">
+                    Cancel
+                </button>
+            </div>
+        </section>
+
+        @if (IsEditMode)
+        {
+            <section class="danger-zone" aria-labelledby="danger-zone-heading">
+                <div class="danger-copy">
+                    <h2 id="danger-zone-heading">Danger Zone</h2>
+                    <p>Deleting this invoice will permanently remove it and its line items. This action cannot be undone.</p>
+                </div>
+                <div class="danger-action-row">
+                    <p>This is a permanent action.</p>
+                    <button type="button"
+                            class="button button-danger delete-invoice-button"
+                            disabled="@IsSaving"
+                            @onclick="ShowDeleteDialogAsync">
+                        <img src="assets/icons/trash-white.svg" alt="" aria-hidden="true" />
+                        Delete Invoice
+                    </button>
+                </div>
+            </section>
+        }
+    </div>
+</EditForm>
+
+@if (IsEditMode)
+{
+    <InvoiceDeleteDialog @ref="_deleteDialog" InvoiceDeleted="HandleInvoiceDeletedAsync" />
+}
+
+@code {
+    private InvoiceEditorModel? _boundModel;
+    private EditContext _editContext = null!;
+    private ValidationMessageStore _serverMessages = null!;
+    private InvoiceDeleteDialog? _deleteDialog;
+    private ElementReference _validationAlert;
+    private int _validationErrorCount;
+    private bool _focusValidationAlert;
+    private bool _hasDuplicateInvoiceNumberError;
+    private bool _validationAttempted;
+
+    [Parameter, EditorRequired]
+    public InvoiceEditorModel Model { get; set; } = null!;
+
+    [Parameter]
+    public Guid? InvoiceId { get; set; }
+
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+
+    [Parameter]
+    public EventCallback<InvoiceSummaryDto> OnDelete { get; set; }
+
+    private bool IsEditMode => InvoiceId.HasValue;
+
+    private bool IsSaveDisabled =>
+        IsSaving || (_validationAttempted && _validationErrorCount > 0);
+
+    private string ValidationAlertText =>
+        $"{_validationErrorCount} {(_validationErrorCount == 1 ? "error was" : "errors were")} found — " +
+        "Please fix the highlighted fields before saving.";
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_boundModel, Model))
+        {
+            ResetEditContext();
+        }
+    }
+
+    public void SetInvoiceNumberError(string message)
+    {
+        var field = new FieldIdentifier(Model, nameof(Model.InvoiceNumber));
+        _serverMessages.Clear(field);
+        _serverMessages.Add(field, message);
+        _hasDuplicateInvoiceNumberError = true;
+        _validationAttempted = true;
+        _focusValidationAlert = true;
+        UpdateValidationState();
+    }
+
+    public async Task SubmitAsync()
+    {
+        await ValidateAndSaveAsync();
+    }
+
+    private Task HandleSubmitAsync(EditContext editContext) => ValidateAndSaveAsync();
+
+    private async Task ValidateAndSaveAsync()
+    {
+        if (IsSaving)
+        {
+            return;
+        }
+
+        ClearServerMessages();
+        _editContext.Validate();
+        NotifyAllEditableFieldsChanged();
+
+        if (!_editContext.GetValidationMessages().Any())
+        {
+            _validationAttempted = false;
+            _validationErrorCount = 0;
+            await OnSave.InvokeAsync();
+            return;
+        }
+
+        _validationAttempted = true;
+        _focusValidationAlert = true;
+        UpdateValidationState();
+    }
+
+    private void NotifyAllEditableFieldsChanged(bool includeInvoiceNumber = true)
+    {
+        if (includeInvoiceNumber)
+        {
+            _editContext.NotifyFieldChanged(new FieldIdentifier(Model, nameof(Model.InvoiceNumber)));
+        }
+
+        _editContext.NotifyFieldChanged(new FieldIdentifier(Model, nameof(Model.CustomerName)));
+        _editContext.NotifyFieldChanged(new FieldIdentifier(Model, nameof(Model.IssueDate)));
+        _editContext.NotifyFieldChanged(new FieldIdentifier(Model, nameof(Model.CurrencyCode)));
+
+        foreach (var lineItem in Model.LineItems)
+        {
+            _editContext.NotifyFieldChanged(new FieldIdentifier(lineItem, nameof(lineItem.Description)));
+            _editContext.NotifyFieldChanged(new FieldIdentifier(lineItem, nameof(lineItem.Quantity)));
+            _editContext.NotifyFieldChanged(new FieldIdentifier(lineItem, nameof(lineItem.UnitPrice)));
+            _editContext.NotifyFieldChanged(new FieldIdentifier(lineItem, nameof(lineItem.DiscountPercent)));
+        }
+    }
+
+    private void HandleStructureChanged()
+    {
+        if (_validationAttempted)
+        {
+            _editContext.Validate();
+            NotifyAllEditableFieldsChanged(includeInvoiceNumber: false);
+            UpdateValidationState();
+            return;
+        }
+
+        UpdateValidationState();
+    }
+
+    private async Task RetrySaveAsync()
+    {
+        if (OnRetry.HasDelegate)
+        {
+            await OnRetry.InvokeAsync();
+            return;
+        }
+
+        await SubmitAsync();
+    }
+
+    private Task ShowDeleteDialogAsync()
+    {
+        if (!InvoiceId.HasValue || _deleteDialog is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var invoice = new InvoiceSummaryDto(
+            InvoiceId.Value,
+            Model.InvoiceNumber,
+            Model.CustomerName,
+            Model.IssueDate,
+            Model.CurrencyCode,
+            Model.GrandTotal);
+
+        return _deleteDialog.ShowAsync(invoice);
+    }
+
+    private Task HandleInvoiceDeletedAsync(InvoiceSummaryDto invoice) =>
+        OnDelete.InvokeAsync(invoice);
+
+    private RenderFragment SaveButtonContent() => @<text>
+        @if (IsSaving)
+        {
+            <img class="saving-icon" src="assets/icons/loader.svg" alt="" aria-hidden="true" />
+            <span>Saving…</span>
+        }
+        else
+        {
+            <span>Save Invoice</span>
+        }
+    </text>;
+
+    private void ResetEditContext()
+    {
+        if (_editContext is not null)
+        {
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+            _editContext.OnValidationStateChanged -= HandleValidationStateChanged;
+        }
+
+        _boundModel = Model;
+        _editContext = new EditContext(Model);
+        _serverMessages = new ValidationMessageStore(_editContext);
+        _editContext.OnFieldChanged += HandleFieldChanged;
+        _editContext.OnValidationStateChanged += HandleValidationStateChanged;
+        _validationErrorCount = 0;
+        _validationAttempted = false;
+        _hasDuplicateInvoiceNumberError = false;
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs args)
+    {
+        if (ReferenceEquals(args.FieldIdentifier.Model, Model) &&
+            args.FieldIdentifier.FieldName == nameof(Model.InvoiceNumber) &&
+            _hasDuplicateInvoiceNumberError)
+        {
+            ClearDuplicateInvoiceNumberError();
+        }
+
+        _validationErrorCount = _editContext.GetValidationMessages().Count();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleInvoiceNumberInput(ChangeEventArgs args) =>
+        ClearDuplicateInvoiceNumberError();
+
+    private void ClearDuplicateInvoiceNumberError()
+    {
+        if (!_hasDuplicateInvoiceNumberError)
+        {
+            return;
+        }
+
+        var field = new FieldIdentifier(Model, nameof(Model.InvoiceNumber));
+        _serverMessages.Clear(field);
+        _hasDuplicateInvoiceNumberError = false;
+        _validationErrorCount = _editContext.GetValidationMessages().Count();
+        _editContext.NotifyValidationStateChanged();
+    }
+
+    private void HandleValidationStateChanged(object? sender, ValidationStateChangedEventArgs args)
+    {
+        _validationErrorCount = _editContext.GetValidationMessages().Count();
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusValidationAlert)
+        {
+            _focusValidationAlert = false;
+            await _validationAlert.FocusAsync();
+        }
+    }
+
+    private void ClearServerMessages()
+    {
+        _serverMessages.Clear();
+        _hasDuplicateInvoiceNumberError = false;
+        _editContext.NotifyValidationStateChanged();
+    }
+
+    private void UpdateValidationState()
+    {
+        _validationErrorCount = _editContext.GetValidationMessages().Count();
+        _editContext.NotifyValidationStateChanged();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        if (_editContext is not null)
+        {
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+            _editContext.OnValidationStateChanged -= HandleValidationStateChanged;
+        }
+    }
+}

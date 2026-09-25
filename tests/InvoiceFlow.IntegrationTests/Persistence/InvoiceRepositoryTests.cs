@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using InvoiceFlow.Application.Invoices.Exceptions;
 using InvoiceFlow.Domain.Invoices;
 using InvoiceFlow.Infrastructure.Invoices;
 using Microsoft.EntityFrameworkCore;
@@ -152,16 +153,51 @@ public sealed class InvoiceRepositoryTests
     }
 
     [Fact]
-    public async Task Add_WithDuplicateInvoiceNumber_IsRejectedByDatabase()
+    public async Task Add_WithDuplicateInvoiceNumber_ThrowsApplicationException()
     {
         await using var database = await TestDatabase.CreateAsync();
-        await database.Repository.AddAsync(CreateInvoice("INV-UNIQUE"));
+        var storedInvoice = CreateInvoice("INV-UNIQUE");
+        await database.Repository.AddAsync(storedInvoice);
 
-        var exception = await Assert.ThrowsAsync<DbUpdateException>(() =>
+        var exception = await Assert.ThrowsAsync<DuplicateInvoiceNumberException>(() =>
             database.Repository.AddAsync(CreateInvoice("INV-UNIQUE")));
 
-        Assert.Contains("UNIQUE", exception.InnerException?.Message);
-        Assert.Single(await database.Repository.GetAllAsync());
+        Assert.Equal("INV-UNIQUE", exception.InvoiceNumber);
+        var invoices = await database.Repository.GetAllAsync();
+        var persistedInvoice = Assert.Single(invoices);
+        Assert.Equal(storedInvoice.Id, persistedInvoice.Id);
+        Assert.Equal("INV-UNIQUE", persistedInvoice.InvoiceNumber);
+    }
+
+    [Fact]
+    public async Task Update_WithDuplicateInvoiceNumber_ThrowsApplicationException()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var firstInvoice = CreateInvoice("INV-FIRST");
+        var secondInvoice = CreateInvoice("INV-SECOND");
+        await database.Repository.AddAsync(firstInvoice);
+        await database.Repository.AddAsync(secondInvoice);
+
+        var duplicate = Assert.IsType<Invoice>(
+            await database.Repository.GetByIdAsync(secondInvoice.Id));
+        duplicate.UpdateDetails(
+            firstInvoice.InvoiceNumber,
+            "Changed customer",
+            new DateOnly(2026, 9, 25),
+            "EUR");
+
+        var exception = await Assert.ThrowsAsync<DuplicateInvoiceNumberException>(() =>
+            database.Repository.UpdateAsync(duplicate));
+
+        Assert.Equal("INV-FIRST", exception.InvoiceNumber);
+        var invoices = await database.Repository.GetAllAsync();
+        Assert.Equal(2, invoices.Count);
+        var persistedFirst = Assert.Single(invoices, invoice => invoice.Id == firstInvoice.Id);
+        var persistedSecond = Assert.Single(invoices, invoice => invoice.Id == secondInvoice.Id);
+        Assert.Equal("INV-FIRST", persistedFirst.InvoiceNumber);
+        Assert.Equal("INV-SECOND", persistedSecond.InvoiceNumber);
+        Assert.Equal("Acme Ltd", persistedSecond.CustomerName);
+        Assert.Equal("USD", persistedSecond.CurrencyCode);
     }
 
     [Fact]

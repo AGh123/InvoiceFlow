@@ -1,6 +1,7 @@
 @page "/invoices"
 @implements IDisposable
 @inject InvoiceFlow.Application.Invoices.InvoiceService InvoiceService
+@inject InvoiceNotificationState NotificationState
 @inject ILogger<InvoiceListPage> Logger
 
 <PageTitle>Invoices · InvoiceFlow</PageTitle>
@@ -62,7 +63,11 @@
     private string PageClass =>
         $"invoice-page{(!_isLoading && _loadError is null && _invoices.Count == 0 ? " invoice-page-empty" : string.Empty)}";
 
-    protected override async Task OnInitializedAsync() => await LoadInvoicesAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _successMessage = NotificationState.Consume();
+        await LoadInvoicesAsync();
+    }
 
     private async Task LoadInvoicesAsync()
     {

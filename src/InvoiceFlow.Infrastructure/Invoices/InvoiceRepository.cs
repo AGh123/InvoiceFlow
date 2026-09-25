@@ -1,6 +1,8 @@
 using InvoiceFlow.Application.Invoices.Abstractions;
+using InvoiceFlow.Application.Invoices.Exceptions;
 using InvoiceFlow.Domain.Invoices;
 using InvoiceFlow.Infrastructure.Persistence;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace InvoiceFlow.Infrastructure.Invoices;
@@ -48,7 +50,15 @@ public sealed class InvoiceRepository(
             await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         await dbContext.Invoices.AddAsync(invoice, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsDuplicateInvoiceNumber(exception))
+        {
+            throw new DuplicateInvoiceNumberException(invoice.InvoiceNumber, exception);
+        }
     }
 
     public async Task UpdateAsync(
@@ -111,7 +121,14 @@ public sealed class InvoiceRepository(
                 suppliedLineItem.DiscountPercent);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsDuplicateInvoiceNumber(exception))
+        {
+            throw new DuplicateInvoiceNumberException(invoice.InvoiceNumber, exception);
+        }
     }
 
     public async Task DeleteAsync(
@@ -131,4 +148,14 @@ public sealed class InvoiceRepository(
         dbContext.Invoices.Remove(persistedInvoice);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    private static bool IsDuplicateInvoiceNumber(DbUpdateException exception) =>
+        exception.InnerException is SqliteException
+        {
+            SqliteErrorCode: 19,
+            SqliteExtendedErrorCode: 2067,
+        } sqliteException &&
+        sqliteException.Message.Contains(
+            "UNIQUE constraint failed: Invoices.InvoiceNumber",
+            StringComparison.Ordinal);
 }

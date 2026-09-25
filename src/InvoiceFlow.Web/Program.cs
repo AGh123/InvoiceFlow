@@ -2,11 +2,13 @@ using InvoiceFlow.Application.Invoices;
 using InvoiceFlow.Infrastructure;
 using InvoiceFlow.Infrastructure.Persistence;
 using InvoiceFlow.Web.Components;
+using InvoiceFlow.Web.Components.Invoices;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddValidation();
 
 var databasePath = Path.Combine(
     builder.Environment.ContentRootPath,
@@ -15,6 +17,7 @@ var databasePath = Path.Combine(
 
 builder.Services.AddInfrastructure(databasePath);
 builder.Services.AddScoped<InvoiceService>();
+builder.Services.AddScoped<InvoiceNotificationState>();
 
 var app = builder.Build();
 
