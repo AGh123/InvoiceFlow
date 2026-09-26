@@ -7,6 +7,7 @@ namespace InvoiceFlow.Web.Components.Invoices.Models;
 [Microsoft.Extensions.Validation.Embedded.ValidatableType]
 public sealed class InvoiceEditorModel
 {
+    public string? GeneratedInvoiceNumber { get; set; }
     [Required(ErrorMessage = "Invoice number is required.")]
     [MaxLength(50, ErrorMessage = "Invoice number must be 50 characters or fewer.")]
     public string InvoiceNumber { get; set; } = string.Empty;
@@ -38,11 +39,11 @@ public sealed class InvoiceEditorModel
             CustomerName,
             IssueDate,
             CurrencyCode,
-            LineItems.Select(lineItem => lineItem.ToInput(includeId: false)).ToArray());
+            LineItems.Select(lineItem => lineItem.ToInput(includeId: false)).ToArray(),
+            InvoiceNumber == GeneratedInvoiceNumber);
 
     public UpdateInvoiceRequest ToUpdateRequest() =>
         new(
-            InvoiceNumber,
             CustomerName,
             IssueDate,
             CurrencyCode,

@@ -21,7 +21,16 @@ public class InvoiceEditorTests
         Assert.Contains("Create a new invoice by filling out the details and items below.", cut.Markup);
         Assert.Empty(cut.FindAll(".danger-zone"));
         Assert.False(cut.Find("#invoice-number").HasAttribute("disabled"));
+        Assert.False(cut.Find("#invoice-number").HasAttribute("readonly"));
+        Assert.Single(cut.FindAll("button[type='submit']"));
+        Assert.Contains("Generated automatically. You can change it before saving.", cut.Markup);
+        Assert.Equal("true", cut.Find("#invoice-number").GetAttribute("aria-required"));
+        Assert.Equal("true", cut.Find("#customer-name").GetAttribute("aria-required"));
+        Assert.Equal("true", cut.Find("#issue-date").GetAttribute("aria-required"));
+        Assert.Equal("true", cut.Find("#currency-code").GetAttribute("aria-required"));
         Assert.Contains("No line items yet", cut.Markup);
+        Assert.Equal("Cancel", cut.Find(".final-actions button:first-child").TextContent.Trim());
+        Assert.Equal("Save Invoice", cut.Find(".final-actions button[type='submit']").TextContent.Trim());
     }
 
     [Fact]
@@ -46,6 +55,8 @@ public class InvoiceEditorTests
         Assert.Contains("Edit Invoice", cut.Markup);
         Assert.Contains("Modify invoice details, customer information, or line items.", cut.Markup);
         Assert.Single(cut.FindAll(".danger-zone"));
+        Assert.True(cut.Find("#invoice-number").HasAttribute("readonly"));
+        Assert.Contains("Invoice numbers can't be changed after creation.", cut.Markup);
     }
 
     [Fact]
@@ -83,6 +94,11 @@ public class InvoiceEditorTests
 
         Assert.Contains("1 error was found", cut.Find(".validation-alert").TextContent);
         Assert.Contains("Description is required.", cut.Markup);
+        Assert.Equal("true", cut.Find(".description-field input").GetAttribute("aria-required"));
+        Assert.Equal("true", cut.Find(".quantity-field input").GetAttribute("aria-required"));
+        Assert.Equal("true", cut.Find(".price-field input").GetAttribute("aria-required"));
+        Assert.False(cut.Find(".discount-field input").HasAttribute("aria-required"));
+        Assert.Equal(3, cut.FindAll(".quantity-field input, .price-field input, .discount-field input").Count);
     }
 
     [Fact]
@@ -137,7 +153,8 @@ public class InvoiceEditorTests
         var cut = Render(context, model, invoiceId: Guid.NewGuid(), isSaving: true);
 
         Assert.Contains("Saving…", cut.Markup);
-        Assert.All(cut.FindAll("input"), input => Assert.True(input.HasAttribute("disabled")));
+        Assert.All(cut.FindAll("input:not([readonly])"), input => Assert.True(input.HasAttribute("disabled")));
+        Assert.True(cut.Find("#invoice-number").HasAttribute("readonly"));
         Assert.All(cut.FindAll("button"), button => Assert.True(button.HasAttribute("disabled")));
         Assert.Equal("true", cut.Find("form").GetAttribute("aria-busy"));
     }

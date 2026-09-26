@@ -76,6 +76,7 @@ public class InvoiceEditorModelTests
         Assert.Equal(existingId, Assert.Single(update.LineItems).Id);
         Assert.Equal(model.InvoiceNumber, create.InvoiceNumber);
         Assert.Equal(model.CustomerName, update.CustomerName);
+        Assert.Null(update.GetType().GetProperty(nameof(model.InvoiceNumber)));
     }
 
     [Fact]

@@ -6,6 +6,13 @@ namespace InvoiceFlow.Web.Tests.TestDoubles;
 internal sealed class FakeInvoiceRepository : IInvoiceRepository
 {
     public List<Invoice> Invoices { get; } = [];
+    private long _nextSequence;
+
+    public Task<long> ReserveInvoiceSequenceAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Interlocked.Increment(ref _nextSequence));
+
+    public Task<bool> InvoiceNumberExistsAsync(string invoiceNumber, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Invoices.Any(invoice => invoice.InvoiceNumber == invoiceNumber));
 
     public Func<CancellationToken, Task<IReadOnlyList<Invoice>>>? GetAllHandler { get; set; }
 

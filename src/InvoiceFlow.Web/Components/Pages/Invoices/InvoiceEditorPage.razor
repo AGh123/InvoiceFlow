@@ -40,6 +40,7 @@ else if (_loadError)
 }
 else if (_model is not null)
 {
+    <NavigationLock ConfirmExternalNavigation="@IsDirty" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
     <InvoiceEditor @ref="_editor"
                    Model="_model"
                    InvoiceId="Id"
@@ -48,7 +49,9 @@ else if (_model is not null)
                    OnSave="SaveAsync"
                    OnCancel="Cancel"
                    OnRetry="RetrySaveAsync"
-                   OnDelete="HandleDeleted" />
+                   OnDelete="HandleDeleted"
+                   OnChanged="HandleEditorChanged" />
+    <UnsavedChangesDialog @ref="_discardDialog" OnDiscard="DiscardAndNavigate" />
 }
 
 @code {
@@ -57,7 +60,11 @@ else if (_model is not null)
 
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private InvoiceEditor? _editor;
+    private UnsavedChangesDialog? _discardDialog;
     private InvoiceEditorModel? _model;
+    private string? _cleanSnapshot;
+    private string? _pendingNavigation;
+    private bool _allowNavigation;
     private Guid? _loadedRouteId;
     private bool _routeInitialized;
     private bool _isLoading;
@@ -77,6 +84,9 @@ else if (_model is not null)
         _ => "New Invoice",
     };
 
+    private bool IsDirty => !_allowNavigation && _model is not null &&
+        _cleanSnapshot is not null && Snapshot(_model) != _cleanSnapshot;
+
     protected override async Task OnParametersSetAsync()
     {
         if (_routeInitialized && _loadedRouteId == Id)
@@ -91,14 +101,41 @@ else if (_model is not null)
 
     private async Task LoadEditorAsync()
     {
+        _allowNavigation = false;
+        _pendingNavigation = null;
+        _cleanSnapshot = null;
         _notFound = false;
         _loadError = false;
         _saveError = null;
 
         if (!Id.HasValue)
         {
-            _model = new InvoiceEditorModel();
-            _isLoading = false;
+            _isLoading = true;
+            try
+            {
+                var generatedNumber = await InvoiceService.ReserveInvoiceNumberAsync(
+                    _cancellationTokenSource.Token);
+                _model = new InvoiceEditorModel
+                {
+                    InvoiceNumber = generatedNumber,
+                    GeneratedInvoiceNumber = generatedNumber,
+                };
+                _cleanSnapshot = Snapshot(_model);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                Logger.LogError(exception, "Failed to prepare a new invoice.");
+                _model = null;
+                _loadError = true;
+            }
+            catch (OperationCanceledException) when (_cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+            finally
+            {
+                _isLoading = false;
+            }
             return;
         }
 
@@ -118,6 +155,7 @@ else if (_model is not null)
             }
 
             _model = InvoiceEditorModel.FromDetails(invoice);
+            _cleanSnapshot = Snapshot(_model);
         }
         catch (OperationCanceledException) when (_cancellationTokenSource.IsCancellationRequested)
         {
@@ -176,6 +214,7 @@ else if (_model is not null)
             }
 
             NotificationState.Publish($"Invoice {savedInvoiceNumber} saved successfully");
+            _allowNavigation = true;
             NavigationManager.NavigateTo("/invoices");
         }
         catch (InvoiceFlow.Application.Invoices.Exceptions.DuplicateInvoiceNumberException)
@@ -201,8 +240,54 @@ else if (_model is not null)
 
     private void Cancel() => NavigationManager.NavigateTo("/invoices");
 
+    private void HandleEditorChanged() => StateHasChanged();
+
+    private async Task ConfirmNavigationAsync(LocationChangingContext context)
+    {
+        if (!IsDirty)
+        {
+            return;
+        }
+
+        context.PreventNavigation();
+        _pendingNavigation = context.TargetLocation;
+        if (_discardDialog is not null)
+        {
+            await _discardDialog.ShowAsync();
+        }
+    }
+
+    private void DiscardAndNavigate()
+    {
+        if (_pendingNavigation is null)
+        {
+            return;
+        }
+
+        _allowNavigation = true;
+        NavigationManager.NavigateTo(_pendingNavigation);
+    }
+
+    private static string Snapshot(InvoiceEditorModel model) =>
+        System.Text.Json.JsonSerializer.Serialize(new
+        {
+            model.InvoiceNumber,
+            model.CustomerName,
+            model.IssueDate,
+            model.CurrencyCode,
+            Items = model.LineItems.Select(item => new
+            {
+                item.Id,
+                item.Description,
+                item.Quantity,
+                item.UnitPrice,
+                item.DiscountPercent,
+            }).ToArray(),
+        });
+
     private void HandleDeleted(InvoiceSummaryDto invoice)
     {
+        _allowNavigation = true;
         NotificationState.Publish($"Invoice {invoice.InvoiceNumber} deleted successfully");
         NavigationManager.NavigateTo("/invoices");
     }

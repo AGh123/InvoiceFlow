@@ -1,0 +1,8 @@
+.sort-picker { position: relative; }
+.sort-trigger { align-items: center; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); display: flex; font-size: .875rem; font-weight: 500; gap: var(--space-3); height: 2.125rem; justify-content: space-between; min-width: 9.5rem; padding: 0 var(--space-3); }
+.sort-trigger img { display: block; width: .75rem; }
+.sort-menu { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); box-shadow: var(--shadow-floating); min-width: 11rem; padding: var(--space-1); position: absolute; right: 0; top: calc(100% + .375rem); z-index: 25; }
+.sort-option { align-items: center; background: transparent; border: 0; border-radius: var(--radius-icon); color: var(--color-text); display: flex; font-size: .8125rem; justify-content: space-between; min-height: 2.5rem; padding: var(--space-2) var(--space-3); text-align: left; white-space: nowrap; width: 100%; }
+.sort-option:hover, .sort-option.active { background: var(--color-primary-soft); }
+.sort-option[aria-selected="true"] { color: var(--color-primary-dark); font-weight: 600; }
+@media (max-width: 48rem) { .sort-trigger { height: 2.75rem; min-width: 10rem; } }

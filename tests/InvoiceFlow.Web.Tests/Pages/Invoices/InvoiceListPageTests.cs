@@ -4,6 +4,7 @@ using InvoiceFlow.Application.Invoices.Abstractions;
 using InvoiceFlow.Domain.Invoices;
 using InvoiceFlow.Web.Components.Invoices;
 using InvoiceFlow.Web.Components.Pages.Invoices;
+using InvoiceFlow.Web.Components.Shared;
 using InvoiceFlow.Web.Tests.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -43,10 +44,32 @@ public class InvoiceListPageTests
 
         var first = context.Render<InvoiceListPage>();
         Assert.Contains("Invoice INV-100 saved successfully", first.Markup);
+        Assert.Equal(3000, first.FindComponent<StatusMessage>().Instance.AutoDismissMilliseconds);
         first.Dispose();
 
         var second = context.Render<InvoiceListPage>();
         Assert.DoesNotContain("Invoice INV-100 saved successfully", second.Markup);
+    }
+
+    [Fact]
+    public void DeletingFromList_ShowsFloatingSuccessMessage()
+    {
+        using var context = CreateContext(out var repository, out _);
+        repository.Invoices.Add(Invoice());
+        var cut = context.Render<InvoiceListPage>();
+
+        cut.Find(".desktop-list .actions-trigger").Click();
+        cut.Find(".desktop-list .actions-menu button").Click();
+        cut.Find(".delete-dialog .button-danger").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var message = cut.FindComponent<StatusMessage>();
+            Assert.Equal("Invoice INV-100 deleted successfully", message.Instance.Message);
+            Assert.True(message.Instance.Floating);
+            Assert.Equal(3000, message.Instance.AutoDismissMilliseconds);
+            Assert.Empty(repository.Invoices);
+        });
     }
 
     [Fact]

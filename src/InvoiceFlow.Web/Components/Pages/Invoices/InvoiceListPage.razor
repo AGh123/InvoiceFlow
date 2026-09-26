@@ -9,8 +9,10 @@
 <section class="@PageClass">
     @if (!string.IsNullOrWhiteSpace(_successMessage))
     {
-        <StatusMessage Message="@_successMessage"
+        <StatusMessage @key="_successMessageVersion"
+                       Message="@_successMessage"
                        Floating="true"
+                       AutoDismissMilliseconds="3000"
                        OnDismiss="DismissSuccess" />
     }
 
@@ -59,6 +61,7 @@
     private bool _isLoading = true;
     private string? _loadError;
     private string? _successMessage;
+    private long _successMessageVersion;
 
     private string PageClass =>
         $"invoice-page{(!_isLoading && _loadError is null && _invoices.Count == 0 ? " invoice-page-empty" : string.Empty)}";
@@ -66,6 +69,7 @@
     protected override async Task OnInitializedAsync()
     {
         _successMessage = NotificationState.Consume();
+        if (_successMessage is not null) _successMessageVersion++;
         await LoadInvoicesAsync();
     }
 
@@ -99,6 +103,7 @@
     {
         _invoices.RemoveAll(existing => existing.Id == invoice.Id);
         _successMessage = $"Invoice {invoice.InvoiceNumber} deleted successfully";
+        _successMessageVersion++;
     }
 
     private void DismissSuccess() => _successMessage = null;

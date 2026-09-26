@@ -61,19 +61,8 @@ else
             </div>
 
             <div class="sort-control">
-                <label for="invoice-sort">Sort by:</label>
-                <div class="select-wrapper">
-                    <select id="invoice-sort" @bind="SortOption">
-                        <option value="newest">Newest first</option>
-                        <option value="oldest">Oldest first</option>
-                        <option value="customer">Customer A–Z</option>
-                        <option value="number">Invoice number</option>
-                    </select>
-                    <picture aria-hidden="true">
-                        <source media="(max-width: 48rem)" srcset="assets/icons/chevron-down-mobile.svg" />
-                        <img src="assets/icons/chevron-down-desktop.svg" alt="" />
-                    </picture>
-                </div>
+                <span id="invoice-sort-label">Sort by:</span>
+                <InvoiceSortControl Value="@SortOption" ValueChanged="SetSortOption" />
             </div>
         </div>
 
@@ -113,7 +102,7 @@ else
                                 <td class="customer-cell">@invoice.CustomerName</td>
                                 <td class="muted-cell">@FormatDate(invoice.IssueDate)</td>
                                 <td class="amount-cell">@FormatAmount(invoice)</td>
-                                <td class="actions-cell">@Actions(invoice)</td>
+                                <td class="actions-cell">@Actions(invoice, "desktop")</td>
                             </tr>
                         }
                     </tbody>
@@ -126,7 +115,7 @@ else
                     <li class="invoice-card" @key="invoice.Id">
                         <div class="card-header">
                             <a class="invoice-link" href="@InvoiceHref(invoice)">@invoice.InvoiceNumber</a>
-                            @Actions(invoice)
+                            @Actions(invoice, "mobile")
                         </div>
                         <p class="card-customer">@invoice.CustomerName</p>
                         <div class="card-meta">
@@ -168,6 +157,7 @@ else
     private string _searchTerm = string.Empty;
     private string _sortOption = "newest";
     private int _currentPage = 1;
+    private string? _openMenuKey;
 
     [Parameter, EditorRequired]
     public IReadOnlyList<InvoiceSummaryDto> Invoices { get; set; } = [];
@@ -204,6 +194,8 @@ else
             _currentPage = 1;
         }
     }
+
+    private void SetSortOption(string value) => SortOption = value;
 
     protected override void OnParametersSet()
     {
@@ -262,20 +254,18 @@ else
 
     private static string InvoiceHref(InvoiceSummaryDto invoice) => $"/invoices/{invoice.Id}";
 
-    private RenderFragment Actions(InvoiceSummaryDto invoice) => @<text>
-        <details class="row-actions">
-            <summary aria-label="@($"Actions for invoice {invoice.InvoiceNumber}")">
-                <img class="actions-icon"
-                     src="assets/icons/more-ellipsis.svg"
-                     alt=""
-                     aria-hidden="true" />
-            </summary>
-            <div class="actions-popover">
-                <a href="@InvoiceHref(invoice)">Open invoice</a>
-                <button type="button" @onclick="() => ShowDeleteDialogAsync(invoice)">Delete</button>
-            </div>
-        </details>
+    private RenderFragment Actions(InvoiceSummaryDto invoice, string view) => @<text>
+        <InvoiceActionsMenu Invoice="invoice" Open="@(_openMenuKey == $"{view}-{invoice.Id}")"
+                            OnToggle="() => OpenMenu(view, invoice.Id)"
+                            OnClose="() => CloseMenu(view, invoice.Id)"
+                            OnDelete="ShowDeleteDialogAsync" />
     </text>;
+
+    private void OpenMenu(string view, Guid id) => _openMenuKey = $"{view}-{id}";
+    private void CloseMenu(string view, Guid id)
+    {
+        if (_openMenuKey == $"{view}-{id}") _openMenuKey = null;
+    }
 
     private Task ShowDeleteDialogAsync(InvoiceSummaryDto invoice) =>
         _deleteDialog?.ShowAsync(invoice) ?? Task.CompletedTask;

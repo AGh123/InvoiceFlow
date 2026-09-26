@@ -1,13 +1,54 @@
 using System.Collections.ObjectModel;
 using InvoiceFlow.Application.Invoices.Exceptions;
+using InvoiceFlow.Application.Invoices;
+using InvoiceFlow.Application.Invoices.Requests;
+using InvoiceFlow.Application.Invoices.Abstractions;
 using InvoiceFlow.Domain.Invoices;
 using InvoiceFlow.Infrastructure.Invoices;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using InvoiceFlow.Infrastructure;
+using InvoiceFlow.Infrastructure.Persistence;
 
 namespace InvoiceFlow.IntegrationTests.Persistence;
 
 public sealed class InvoiceRepositoryTests
 {
+    [Fact]
+    public async Task GeneratedNumberSequence_PersistsAcrossServiceProviderRestart()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var firstService = new InvoiceService(database.Repository);
+        var first = await firstService.CreateInvoiceAsync(new CreateInvoiceRequest(
+            null, "Acme", new DateOnly(2026, 9, 26), "USD", []));
+        var custom = await firstService.CreateInvoiceAsync(new CreateInvoiceRequest(
+            "EXT-100", "Globex", new DateOnly(2026, 9, 26), "CHF", []));
+
+        var services = new ServiceCollection();
+        services.AddInfrastructure(database.DatabasePath);
+        await using var restarted = services.BuildServiceProvider();
+        await restarted.ApplyDatabaseMigrationsAsync();
+        var secondService = new InvoiceService(restarted.GetRequiredService<IInvoiceRepository>());
+        var second = await secondService.CreateInvoiceAsync(new CreateInvoiceRequest(
+            null, "Second", new DateOnly(2026, 9, 26), "EUR", []));
+
+        Assert.Matches(@"^INV-\d{4}-\d{6}$", first.InvoiceNumber);
+        Assert.Matches(@"^INV-\d{4}-\d{6}$", second.InvoiceNumber);
+        Assert.NotEqual(first.InvoiceNumber, second.InvoiceNumber);
+        Assert.Equal(first.InvoiceNumber, (await secondService.GetInvoiceAsync(first.Id))!.InvoiceNumber);
+        Assert.Equal("EXT-100", (await secondService.GetInvoiceAsync(custom.Id))!.InvoiceNumber);
+    }
+
+    [Fact]
+    public async Task ConcurrentSequenceReservations_AreUnique()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+
+        var reservations = await Task.WhenAll(Enumerable.Range(0, 12)
+            .Select(_ => database.Repository.ReserveInvoiceSequenceAsync()));
+
+        Assert.Equal(12, reservations.Distinct().Count());
+    }
     [Fact]
     public async Task Migrations_CreateUsableDatabaseFromCleanState()
     {

@@ -16,9 +16,6 @@
             <img src="assets/icons/arrow-left-mobile.svg" alt="" aria-hidden="true" />
             Back
         </a>
-        <button type="submit" class="button button-primary mobile-top-save" disabled="@IsSaveDisabled">
-            @SaveButtonContent()
-        </button>
     </div>
 
     <div class="editor-content">
@@ -56,17 +53,6 @@
                 </div>
             </div>
 
-            <div class="desktop-actions">
-                <button type="button"
-                        class="button button-secondary"
-                        disabled="@IsSaving"
-                        @onclick="OnCancel">
-                    Cancel
-                </button>
-                <button type="submit" class="button button-primary" disabled="@IsSaveDisabled">
-                    @SaveButtonContent()
-                </button>
-            </div>
         </header>
 
         <section class="invoice-details-card" aria-labelledby="invoice-details-heading">
@@ -74,69 +60,56 @@
 
             <div class="details-grid">
                 <div class="field-group invoice-number-field">
-                    <label for="invoice-number">Invoice Number</label>
-                    <InputText id="invoice-number"
-                               maxlength="50"
-                               autocomplete="off"
-                               disabled="@IsSaving"
-                               aria-describedby="invoice-number-error"
-                               @oninput="HandleInvoiceNumberInput"
-                               @bind-Value="Model.InvoiceNumber" />
+                    <label for="invoice-number">Invoice Number <span class="required-mark" aria-hidden="true">*</span></label>
+                    @if (IsEditMode)
+                    {
+                        <input id="invoice-number" value="@Model.InvoiceNumber" readonly aria-required="true"
+                               aria-describedby="invoice-number-help" />
+                    }
+                    else
+                    {
+                        <InputText id="invoice-number" maxlength="50" autocomplete="off"
+                                   disabled="@IsSaving" aria-required="true"
+                                   aria-describedby="invoice-number-help invoice-number-error"
+                                   @oninput="HandleInvoiceNumberInput"
+                                   @bind-Value="Model.InvoiceNumber" />
+                    }
+                    <span id="invoice-number-help" class="field-help">@(IsEditMode
+                        ? "Invoice numbers can't be changed after creation."
+                        : "Generated automatically. You can change it before saving.")</span>
                     <ValidationMessage id="invoice-number-error"
                                        For="@(() => Model.InvoiceNumber)" />
                 </div>
 
                 <div class="field-group customer-field">
-                    <label for="customer-name">Customer Name</label>
+                    <label for="customer-name">Customer Name <span class="required-mark" aria-hidden="true">*</span></label>
                     <InputText id="customer-name"
                                maxlength="200"
                                autocomplete="organization"
                                disabled="@IsSaving"
+                               aria-required="true"
                                placeholder="Enter customer name"
                                aria-describedby="customer-name-error"
+                               @oninput="HandleCustomerInput"
                                @bind-Value="Model.CustomerName" />
                     <ValidationMessage id="customer-name-error"
                                        For="@(() => Model.CustomerName)" />
                 </div>
 
                 <div class="field-group issue-date-field">
-                    <label for="issue-date">Issue Date</label>
-                    <div class="input-with-icon date-input">
-                        <InputDate id="issue-date"
-                                   TValue="DateOnly"
-                                   disabled="@IsSaving"
-                                   aria-describedby="issue-date-error"
-                                   @bind-Value="Model.IssueDate" />
-                        <picture aria-hidden="true">
-                            <source media="(max-width: 48rem)" srcset="assets/icons/calendar-mobile.svg" />
-                            <img src="assets/icons/calendar-desktop.svg" alt="" />
-                        </picture>
-                    </div>
+                    <label id="issue-date-label" for="issue-date">Issue Date <span class="required-mark" aria-hidden="true">*</span></label>
+                    <DatePicker Id="issue-date" Value="Model.IssueDate" ValueChanged="ChangeDate"
+                                Disabled="IsSaving" LabelId="issue-date-label" DescribedBy="issue-date-error"
+                                Invalid="@HasError(nameof(Model.IssueDate))" />
                     <ValidationMessage id="issue-date-error"
                                        For="@(() => Model.IssueDate)" />
                 </div>
 
                 <div class="field-group currency-field">
-                    <label for="currency-code">Currency</label>
-                    <div class="currency-input">
-                        <InputText id="currency-code"
-                                   maxlength="3"
-                                   list="currency-options"
-                                   autocomplete="off"
-                                   disabled="@IsSaving"
-                                   placeholder="USD"
-                                   aria-describedby="currency-code-error currency-code-help"
-                                   @bind-Value="Model.CurrencyCode" />
-                        <datalist id="currency-options">
-                            <option value="USD">US Dollar</option>
-                            <option value="EUR">Euro</option>
-                            <option value="GBP">British Pound</option>
-                            <option value="CAD">Canadian Dollar</option>
-                            <option value="AUD">Australian Dollar</option>
-                            <option value="JPY">Japanese Yen</option>
-                        </datalist>
-                    </div>
-                    <span id="currency-code-help" class="field-help">Enter any three-letter currency code.</span>
+                    <label for="currency-code">Currency <span class="required-mark" aria-hidden="true">*</span></label>
+                    <CurrencyCombobox Value="@Model.CurrencyCode" ValueChanged="ChangeCurrency"
+                                      Disabled="IsSaving" Invalid="@HasError(nameof(Model.CurrencyCode))" />
+                    <span id="currency-code-help" class="field-help">Use a three-letter currency code.</span>
                     <ValidationMessage id="currency-code-error"
                                        For="@(() => Model.CurrencyCode)" />
                 </div>
@@ -151,7 +124,7 @@
             <p>@(IsEditMode
                 ? "Review your changes before saving."
                 : "Totals update automatically as you edit line items.")</p>
-            <div class="desktop-actions">
+            <div class="final-actions">
                 <button type="button"
                         class="button button-secondary"
                         disabled="@IsSaving"
@@ -160,17 +133,6 @@
                 </button>
                 <button type="submit" class="button button-primary" disabled="@IsSaveDisabled">
                     @SaveButtonContent()
-                </button>
-            </div>
-            <div class="mobile-actions">
-                <button type="submit" class="button button-primary" disabled="@IsSaveDisabled">
-                    @SaveButtonContent()
-                </button>
-                <button type="button"
-                        class="mobile-cancel-button"
-                        disabled="@IsSaving"
-                        @onclick="OnCancel">
-                    Cancel
                 </button>
             </div>
         </section>
@@ -229,6 +191,9 @@
     public EventCallback OnSave { get; set; }
 
     [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    [Parameter]
     public EventCallback OnCancel { get; set; }
 
     [Parameter]
@@ -241,6 +206,9 @@
 
     private bool IsSaveDisabled =>
         IsSaving || (_validationAttempted && _validationErrorCount > 0);
+
+    private bool HasError(string fieldName) =>
+        _editContext.GetValidationMessages(new FieldIdentifier(Model, fieldName)).Any();
 
     private string ValidationAlertText =>
         $"{_validationErrorCount} {(_validationErrorCount == 1 ? "error was" : "errors were")} found — " +
@@ -318,6 +286,7 @@
 
     private void HandleStructureChanged()
     {
+        _ = OnChanged.InvokeAsync();
         if (_validationAttempted)
         {
             _editContext.Validate();
@@ -393,6 +362,7 @@
 
     private void HandleFieldChanged(object? sender, FieldChangedEventArgs args)
     {
+        _ = OnChanged.InvokeAsync();
         if (ReferenceEquals(args.FieldIdentifier.Model, Model) &&
             args.FieldIdentifier.FieldName == nameof(Model.InvoiceNumber) &&
             _hasDuplicateInvoiceNumberError)
@@ -404,8 +374,32 @@
         InvokeAsync(StateHasChanged);
     }
 
-    private void HandleInvoiceNumberInput(ChangeEventArgs args) =>
+    private void HandleInvoiceNumberInput(ChangeEventArgs args)
+    {
+        Model.InvoiceNumber = args.Value?.ToString() ?? string.Empty;
         ClearDuplicateInvoiceNumberError();
+        _editContext.NotifyFieldChanged(new FieldIdentifier(Model, nameof(Model.InvoiceNumber)));
+    }
+
+    private void HandleCustomerInput(ChangeEventArgs args)
+    {
+        Model.CustomerName = args.Value?.ToString() ?? string.Empty;
+        _editContext.NotifyFieldChanged(new FieldIdentifier(Model, nameof(Model.CustomerName)));
+    }
+
+    private Task ChangeDate(DateOnly value)
+    {
+        Model.IssueDate = value;
+        _editContext.NotifyFieldChanged(new FieldIdentifier(Model, nameof(Model.IssueDate)));
+        return Task.CompletedTask;
+    }
+
+    private Task ChangeCurrency(string value)
+    {
+        Model.CurrencyCode = value;
+        _editContext.NotifyFieldChanged(new FieldIdentifier(Model, nameof(Model.CurrencyCode)));
+        return Task.CompletedTask;
+    }
 
     private void ClearDuplicateInvoiceNumberError()
     {

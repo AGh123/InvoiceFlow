@@ -4,14 +4,19 @@ const focusOrigins = new WeakMap();
 const keydownHandlers = new WeakMap();
 
 function restoreFocus(dialog) {
+    if (!dialog.isConnected || dialog.open || !focusOrigins.has(dialog)) return;
     const focusOrigin = focusOrigins.get(dialog);
-    const fallback = document.querySelector(
-        '.row-actions summary, .new-invoice-button, .empty-state a, .brand');
-    const focusTarget = focusOrigin?.isConnected ? focusOrigin : fallback;
+    focusOrigins.delete(dialog);
+    const isVisible = element => element?.isConnected && element.getClientRects().length > 0;
+    const fallback = ['.actions-trigger', '.new-invoice-button', '.empty-state a', '.brand']
+        .flatMap(selector => Array.from(document.querySelectorAll(selector))).find(isVisible);
+    const focusTarget = focusOrigin !== document.body && isVisible(focusOrigin)
+        ? focusOrigin : fallback;
     focusTarget?.focus();
 }
 
 export function showDialog(dialog, initialFocus) {
+    if (!dialog?.isConnected) return;
     if (!cancelHandlers.has(dialog)) {
         const handleCancel = event => {
             if (dialog.dataset.busy === "true") {
@@ -69,7 +74,8 @@ export function showDialog(dialog, initialFocus) {
         dialog.showModal();
     }
 
-    initialFocus.focus();
+    if (initialFocus?.isConnected) initialFocus.focus();
+    else dialog.focus();
 }
 
 export function closeDialog(dialog) {

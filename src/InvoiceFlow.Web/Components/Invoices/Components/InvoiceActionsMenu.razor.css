@@ -1,0 +1,9 @@
+.invoice-actions { display: inline-block; position: relative; }
+.actions-trigger { align-items: center; background: transparent; border: 0; border-radius: var(--radius-icon); display: inline-flex; height: 2.75rem; justify-content: center; width: 2.75rem; }
+.actions-trigger:hover, .actions-trigger[aria-expanded="true"] { background: var(--color-primary-soft); }
+.actions-trigger img { display: block; }
+.actions-menu { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); box-shadow: var(--shadow-floating); min-width: 9rem; padding: var(--space-1); position: absolute; right: 0; top: calc(100% + .375rem); z-index: 25; }
+.actions-menu[data-flip="true"] { bottom: calc(100% + .375rem); top: auto; }
+.actions-menu a, .actions-menu button { background: transparent; border: 0; border-radius: var(--radius-icon); color: var(--color-text); display: block; font-size: .8125rem; min-height: 2.5rem; padding: .6rem var(--space-2); text-align: left; text-decoration: none; width: 100%; }
+.actions-menu a:hover, .actions-menu button:hover, .actions-menu :focus-visible { background: var(--color-primary-soft); }
+.actions-menu button { color: var(--color-danger-text); }

@@ -1,3 +1,5 @@
+@implements IDisposable
+
 <div class="@CssClass" role="@Role" aria-live="@LiveSetting">
     <img class="status-icon" src="@IconPath" alt="" aria-hidden="true" />
 
@@ -35,6 +37,9 @@
     public bool Floating { get; set; }
 
     [Parameter]
+    public int AutoDismissMilliseconds { get; set; }
+
+    [Parameter]
     public string? ActionText { get; set; }
 
     [Parameter]
@@ -42,6 +47,53 @@
 
     [Parameter]
     public EventCallback OnDismiss { get; set; }
+
+    private CancellationTokenSource? _autoDismissCancellation;
+    private string? _scheduledMessage;
+    private int _scheduledMilliseconds;
+    private bool _disposed;
+
+    protected override void OnParametersSet()
+    {
+        var duration = Floating && !IsError && OnDismiss.HasDelegate
+            ? AutoDismissMilliseconds : 0;
+        if (_scheduledMessage == Message && _scheduledMilliseconds == duration) return;
+
+        CancelAutoDismiss();
+        _scheduledMessage = Message;
+        _scheduledMilliseconds = duration;
+        if (duration <= 0) return;
+
+        _autoDismissCancellation = new CancellationTokenSource();
+        _ = DismissLaterAsync(duration, _autoDismissCancellation.Token);
+    }
+
+    private async Task DismissLaterAsync(int duration, CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(duration, token);
+            await InvokeAsync(async () =>
+            {
+                if (!_disposed && !token.IsCancellationRequested)
+                    await OnDismiss.InvokeAsync();
+            });
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
+
+    private void CancelAutoDismiss()
+    {
+        _autoDismissCancellation?.Cancel();
+        _autoDismissCancellation?.Dispose();
+        _autoDismissCancellation = null;
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        CancelAutoDismiss();
+    }
 
     private bool IsError => string.Equals(Kind, "error", StringComparison.OrdinalIgnoreCase);
     private string CssClass => $"status-message status-{(IsError ? "error" : "success")}{(Floating ? " status-floating" : string.Empty)}";

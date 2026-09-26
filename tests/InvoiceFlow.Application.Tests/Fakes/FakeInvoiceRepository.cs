@@ -1,4 +1,5 @@
 using InvoiceFlow.Application.Invoices.Abstractions;
+using InvoiceFlow.Application.Invoices.Exceptions;
 using InvoiceFlow.Domain.Invoices;
 
 namespace InvoiceFlow.Application.Tests.Fakes;
@@ -6,6 +7,13 @@ namespace InvoiceFlow.Application.Tests.Fakes;
 internal sealed class FakeInvoiceRepository : IInvoiceRepository
 {
     private readonly List<Invoice> _invoices = [];
+    private long _nextSequence;
+
+    public Task<long> ReserveInvoiceSequenceAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Interlocked.Increment(ref _nextSequence));
+
+    public Task<bool> InvoiceNumberExistsAsync(string invoiceNumber, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_invoices.Any(invoice => invoice.InvoiceNumber == invoiceNumber));
 
     public IReadOnlyList<Invoice> Invoices => _invoices.AsReadOnly();
 
@@ -31,6 +39,10 @@ internal sealed class FakeInvoiceRepository : IInvoiceRepository
         CancellationToken cancellationToken = default)
     {
         AddCallCount++;
+        if (_invoices.Any(existing => existing.InvoiceNumber == invoice.InvoiceNumber))
+        {
+            throw new DuplicateInvoiceNumberException(invoice.InvoiceNumber, new InvalidOperationException("Duplicate"));
+        }
         _invoices.Add(invoice);
 
         return Task.CompletedTask;

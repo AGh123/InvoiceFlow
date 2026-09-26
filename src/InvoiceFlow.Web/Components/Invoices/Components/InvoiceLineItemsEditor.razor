@@ -42,11 +42,11 @@
     {
         <div class="line-items-grid" role="group" aria-label="Editable invoice line items">
             <div class="line-items-column-headings" aria-hidden="true">
-                <span>Description</span>
-                <span>Quantity</span>
-                <span>Unit Price</span>
-                <span>Discount</span>
-                <span>Total</span>
+                <span>Description <span class="required-mark">*</span></span>
+                <span class="quantity-heading">Quantity <span class="required-mark">*</span></span>
+                <span class="numeric-heading">Unit Price <span class="required-mark">*</span></span>
+                <span class="numeric-heading">Discount</span>
+                <span class="numeric-heading">Total</span>
                 <span></span>
             </div>
 
@@ -60,25 +60,29 @@
                     <legend class="visually-hidden">Line item @itemNumber</legend>
 
                     <div class="line-field description-field">
-                        <label for="@($"{idPrefix}-description")">Description</label>
+                        <label for="@($"{idPrefix}-description")">Description <span class="required-mark" aria-hidden="true">*</span></label>
                         <InputText id="@($"{idPrefix}-description")"
                                    maxlength="500"
                                    autocomplete="off"
                                    disabled="@Disabled"
+                                   aria-required="true"
                                    aria-describedby="@($"{idPrefix}-description-error")"
                                    placeholder="Enter description…"
+                                   @oninput="args => DescriptionInput(args, lineItem)"
                                    @bind-Value="lineItem.Description" />
                         <ValidationMessage id="@($"{idPrefix}-description-error")"
                                            For="@(() => lineItem.Description)" />
                     </div>
 
                     <div class="line-field quantity-field">
-                        <label for="@($"{idPrefix}-quantity")">Quantity</label>
+                        <label for="@($"{idPrefix}-quantity")">Quantity <span class="required-mark" aria-hidden="true">*</span></label>
                         <InputNumberOnInput TValue="decimal"
+                                            SelectOnFocus="true"
                                             id="@($"{idPrefix}-quantity")"
                                             step="any"
                                             inputmode="decimal"
                                             disabled="@Disabled"
+                                            aria-required="true"
                                             aria-describedby="@($"{idPrefix}-quantity-error")"
                                             @bind-Value="lineItem.Quantity" />
                         <ValidationMessage id="@($"{idPrefix}-quantity-error")"
@@ -86,13 +90,15 @@
                     </div>
 
                     <div class="line-field price-field">
-                        <label for="@($"{idPrefix}-price")">Unit Price</label>
+                        <label for="@($"{idPrefix}-price")">Unit Price <span class="required-mark" aria-hidden="true">*</span></label>
                         <InputNumberOnInput TValue="decimal"
+                                            SelectOnFocus="true"
                                             id="@($"{idPrefix}-price")"
                                             min="0"
                                             step="any"
                                             inputmode="decimal"
                                             disabled="@Disabled"
+                                            aria-required="true"
                                             aria-describedby="@($"{idPrefix}-price-error")"
                                             @bind-Value="lineItem.UnitPrice" />
                         <ValidationMessage id="@($"{idPrefix}-price-error")"
@@ -102,6 +108,7 @@
                     <div class="line-field discount-field">
                         <label for="@($"{idPrefix}-discount")">Discount %</label>
                         <InputNumberOnInput TValue="decimal"
+                                            SelectOnFocus="true"
                                             id="@($"{idPrefix}-discount")"
                                             min="0"
                                             max="100"
@@ -145,6 +152,9 @@
 </section>
 
 @code {
+    [CascadingParameter]
+    private EditContext? EditContext { get; set; }
+
     [Parameter, EditorRequired]
     public InvoiceEditorModel Model { get; set; } = null!;
 
@@ -164,6 +174,12 @@
     {
         Model.LineItems.Remove(lineItem);
         await StructureChanged.InvokeAsync();
+    }
+
+    private void DescriptionInput(ChangeEventArgs args, InvoiceLineItemEditorModel lineItem)
+    {
+        lineItem.Description = args.Value?.ToString() ?? string.Empty;
+        EditContext?.NotifyFieldChanged(new FieldIdentifier(lineItem, nameof(lineItem.Description)));
     }
 
     private string FormatAmount(decimal amount)

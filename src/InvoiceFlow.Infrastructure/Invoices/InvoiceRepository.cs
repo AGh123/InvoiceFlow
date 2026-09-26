@@ -13,6 +13,25 @@ public sealed class InvoiceRepository(
     private readonly IDbContextFactory<InvoiceFlowDbContext> _dbContextFactory =
         dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
 
+    public async Task<long> ReserveInvoiceSequenceAsync(CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var connection = dbContext.Database.GetDbConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "INSERT INTO InvoiceNumberSequence DEFAULT VALUES RETURNING Id;";
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt64(result);
+    }
+
+    public async Task<bool> InvoiceNumberExistsAsync(
+        string invoiceNumber, CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await dbContext.Invoices.AsNoTracking()
+            .AnyAsync(invoice => invoice.InvoiceNumber == invoiceNumber, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Invoice>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {

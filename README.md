@@ -7,6 +7,7 @@ InvoiceFlow is a .NET 10 Blazor invoice-management application with SQLite persi
 - List, create, edit, and delete invoices.
 - Add and remove invoice line items.
 - Search invoices by invoice number or customer and sort the results.
+- Generate invoice numbers for new invoices, with an optional manual override before creation.
 - Calculate line gross amounts, discounts, line totals, invoice subtotals, and grand totals.
 - Validate invoice details and nested line items.
 - Use responsive desktop and mobile presentations.
@@ -41,6 +42,8 @@ The editor uses local Blazor component state, an `EditContext`, DataAnnotations,
 
 All persistence operations are delegated through `InvoiceService`, keeping UI state and data binding concerns out of the Domain and persistence layers.
 
+InvoiceFlow uses Blazor Interactive Server. UI components run on the server and call `InvoiceService` directly; browser interactions and render updates travel over the Blazor server circuit, so a separate browser-facing REST API is unnecessary.
+
 ## Validation and error handling
 
 Editor validation provides immediate, field-level feedback, while Domain validation remains authoritative for business rules. A known SQLite uniqueness failure for an invoice number is translated into a provider-neutral Application exception and displayed by the Web UI as a field-level validation error. Unexpected persistence failures produce a generic user-safe message rather than exposing implementation details.
@@ -55,13 +58,16 @@ src/InvoiceFlow.Web/App_Data/invoiceflow.db
 
 The path is relative to the Web application's content root. The application creates the directory as needed and applies EF Core migrations during startup, so no external database server is required. Generated SQLite database files are excluded from source control.
 
+Generated invoice numbers use a persisted SQLite sequence reservation. The invoice-number unique index remains the final protection against collisions, including manually entered numbers.
+
 ## UX decisions
 
 - Invoice lists use a table on desktop and cards on smaller screens while sharing the same data, filtering, sorting, and handlers.
 - The invoice editor reflows for mobile use and provides clear saving, empty, error, and success states.
-- Forms use meaningful labels, visible focus, keyboard-accessible controls, and an accessible native delete dialog with managed focus.
+- Forms use required labels, visible focus, keyboard-accessible date, currency, sort, and action controls, and dialogs with managed focus.
+- Unsaved editor changes prompt before internal navigation; refresh and external navigation use the browser's standard confirmation.
 - Zero-line-item invoices are intentionally valid.
-- Invoice numbers remain user-editable.
+- New invoices receive a generated invoice number that can be changed before the first save to support externally assigned identifiers. The number is stable after creation and cannot be edited.
 - Any valid three-letter currency code is supported.
 
 ## Getting started
@@ -80,7 +86,7 @@ Open the HTTPS or HTTP address printed by ASP.NET in the terminal. No external d
 
 1. Open **Invoices**.
 2. Select **Create Invoice** to start a new invoice.
-3. Enter the invoice number, customer, issue date, and currency details.
+3. Review the generated invoice number and enter the customer, issue date, and currency details. Change the number before saving if needed.
 4. Use **Add Line Item** and **Remove** to manage line items as needed.
 5. Select **Save Invoice**.
 6. Select an invoice number in the list to edit an existing invoice.
@@ -94,7 +100,7 @@ Run the complete test suite from the repository root:
 dotnet test InvoiceFlow.slnx
 ```
 
-The solution currently contains 143 tests across four projects:
+The solution has automated tests across four projects:
 
 - `InvoiceFlow.Domain.Tests` covers entities, validation, and calculations.
 - `InvoiceFlow.Application.Tests` covers service use cases and repository interactions.
@@ -124,6 +130,7 @@ tests/
 ## Design notes and trade-offs
 
 - SQLite keeps the application portable and makes reviewer setup straightforward.
+- Reserving a number when a new editor opens can leave gaps if the draft is abandoned; uniqueness matters more than gap-free numbering here.
 - Zero-line-item invoices are allowed by the established requirements.
 - Mutable editor models stay in Web so UI binding concerns do not leak into Domain entities.
 - Desktop tables and mobile cards use appropriate semantic markup while sharing state and behavior.

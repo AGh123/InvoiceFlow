@@ -41,6 +41,20 @@ public class InvoiceLineItemsEditorTests
     }
 
     [Fact]
+    public void LineItemNumericInputs_OptIntoSelectOnFocus()
+    {
+        using var context = new BunitContext();
+        var model = ValidModel();
+        model.LineItems.Add(Item("Service"));
+
+        var cut = Render(context, model);
+
+        var numericInputs = cut.FindComponents<InputNumberOnInput<decimal>>();
+        Assert.Equal(3, numericInputs.Count);
+        Assert.All(numericInputs, input => Assert.True(input.Instance.SelectOnFocus));
+    }
+
+    [Fact]
     public void Remove_RemovesOnlySelectedItemAndPreservesRemainingItems()
     {
         using var context = new BunitContext();
@@ -92,6 +106,7 @@ public class InvoiceLineItemsEditorTests
         InvoiceEditorModel model,
         bool disabled = false)
     {
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         var editContext = new EditContext(model);
         return context.Render<InvoiceLineItemsEditor>(parameters => parameters
             .AddCascadingValue(editContext)
