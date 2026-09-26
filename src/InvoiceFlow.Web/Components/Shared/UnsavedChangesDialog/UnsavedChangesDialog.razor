@@ -1,0 +1,13 @@
+@namespace InvoiceFlow.Web.Components.Shared
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<dialog class="unsaved-dialog" @ref="_dialog" data-open="@_isOpen.ToString().ToLowerInvariant()" aria-labelledby="discard-title"
+        aria-describedby="discard-description" @onclose="Closed">
+    <h2 id="discard-title">Discard unsaved changes?</h2>
+    <p id="discard-description">You have unsaved changes. If you leave this page, your changes will be lost.</p>
+    <div class="unsaved-dialog__actions">
+        <button @ref="_keepButton" type="button" class="button button--secondary" @onclick="CloseAsync">Keep editing</button>
+        <button type="button" class="button button--danger" @onclick="DiscardAsync">Discard changes</button>
+    </div>
+</dialog>

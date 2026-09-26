@@ -1,0 +1,16 @@
+@namespace InvoiceFlow.Web.Components.Layout
+<header class="app-header">
+    <a class="app-header__brand" href="/invoices" aria-label="InvoiceFlow invoices">
+        <span class="app-header__brand-mark" aria-hidden="true">
+            <picture>
+                <source media="(max-width: 48rem)" srcset="assets/icons/logo-mobile.svg" />
+                <img src="assets/icons/logo-desktop.svg" alt="" />
+            </picture>
+        </span>
+        <span>InvoiceFlow</span>
+    </a>
+
+    <nav aria-label="Primary navigation">
+        <NavLink class="app-header__nav-link" href="/invoices" Match="NavLinkMatch.Prefix">Invoices</NavLink>
+    </nav>
+</header>

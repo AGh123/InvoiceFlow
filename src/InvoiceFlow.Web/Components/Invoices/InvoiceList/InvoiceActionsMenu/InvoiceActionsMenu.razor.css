@@ -1,0 +1,9 @@
+.invoice-actions { display: inline-block; position: relative; }
+.invoice-actions__trigger { align-items: center; background: transparent; border: 0; border-radius: var(--radius-icon); display: inline-flex; height: 2.75rem; justify-content: center; width: 2.75rem; }
+.invoice-actions__trigger:hover, .invoice-actions__trigger[aria-expanded="true"] { background: var(--color-primary-soft); }
+.invoice-actions__trigger img { display: block; }
+.invoice-actions__menu { border-radius: var(--radius-control); min-width: 9rem; padding: var(--space-1); position: absolute; right: 0; top: calc(100% + .375rem); z-index: 25; }
+.invoice-actions__menu[data-flip="true"] { bottom: calc(100% + .375rem); top: auto; }
+.invoice-actions__menu a, .invoice-actions__menu button { background: transparent; border: 0; border-radius: var(--radius-icon); color: var(--color-text); display: block; font-size: .8125rem; min-height: 2.5rem; padding: .6rem var(--space-2); text-align: left; text-decoration: none; width: 100%; }
+.invoice-actions__menu a:hover, .invoice-actions__menu button:hover, .invoice-actions__menu :focus-visible { background: var(--color-primary-soft); }
+.invoice-actions__menu button { color: var(--color-danger-text); }

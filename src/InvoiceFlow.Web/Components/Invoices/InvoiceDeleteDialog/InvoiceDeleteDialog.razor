@@ -1,0 +1,52 @@
+@namespace InvoiceFlow.Web.Components.Invoices
+@implements IAsyncDisposable
+@inject InvoiceFlow.Application.Invoices.InvoiceService InvoiceService
+@inject ILogger<InvoiceDeleteDialog> Logger
+@inject IJSRuntime JSRuntime
+
+<dialog class="invoice-delete-dialog"
+        @ref="_dialog"
+        role="dialog"
+        aria-modal="true"
+        tabindex="-1"
+        data-busy="@_isBusy.ToString().ToLowerInvariant()"
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+        @onclose="HandleClosed">
+    @if (_invoice is not null)
+    {
+        <div class="invoice-delete-dialog__header">
+            <span class="invoice-delete-dialog__warning-icon" aria-hidden="true">
+                <img src="assets/icons/trash.svg" alt="" />
+            </span>
+            <h2 id="delete-dialog-title">Delete invoice?</h2>
+        </div>
+
+        <p id="delete-dialog-description" class="invoice-delete-dialog__description">
+            You're about to permanently delete
+            <strong>@_invoice.InvoiceNumber</strong> for
+            <strong>@_invoice.CustomerName</strong>. This action cannot be undone.
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <p class="invoice-delete-dialog__error" role="alert">@_errorMessage</p>
+        }
+
+        <div class="invoice-delete-dialog__actions">
+            <button @ref="_cancelButton"
+                    type="button"
+                    class="button button--secondary"
+                    disabled="@_isBusy"
+                    @onclick="CloseAsync">
+                Cancel
+            </button>
+            <button type="button"
+                    class="button button--danger"
+                    disabled="@_isBusy"
+                    @onclick="DeleteAsync">
+                @(_isBusy ? "Deleting…" : "Delete Invoice")
+            </button>
+        </div>
+    }
+</dialog>

@@ -1,9 +1,0 @@
-.currency-combobox { position: relative; }
-.currency-combobox input { text-transform: uppercase; }
-.currency-options { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); box-shadow: var(--shadow-floating); left: 0; max-height: 17rem; overflow-y: auto; padding: var(--space-1); position: absolute; top: calc(100% + .375rem); width: min(100%, 17rem); z-index: 30; }
-.currency-option { align-items: center; background: transparent; border: 0; border-radius: var(--radius-icon); color: var(--color-text); display: flex; font-size: .8125rem; gap: var(--space-3); min-height: 2.5rem; padding: var(--space-2); text-align: left; width: 100%; }
-.currency-option strong { font-variant-numeric: tabular-nums; min-width: 2.5rem; }
-.currency-option span { color: var(--color-text-muted); }
-.currency-option:hover, .currency-option.active { background: var(--color-primary-soft); }
-.currency-option[aria-selected="true"] strong { color: var(--color-primary-dark); }
-@media (max-width: 48rem) { .currency-options { left: auto; right: 0; width: min(17rem, calc(100vw - 2rem)); } }

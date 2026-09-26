@@ -1,0 +1,25 @@
+@namespace InvoiceFlow.Web.Components.Shared
+@implements IDisposable
+
+<div class="@CssClass" role="@Role" aria-live="@LiveSetting">
+    <img class="status-message__icon" src="@IconPath" alt="" aria-hidden="true" />
+
+    <div class="status-message__copy">
+        <p class="status-message__title">@Message</p>
+        @if (!string.IsNullOrWhiteSpace(Detail))
+        {
+            <p class="status-message__detail">@Detail</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(ActionText) && OnAction.HasDelegate)
+        {
+            <button type="button" class="status-message__action" @onclick="OnAction">@ActionText</button>
+        }
+    </div>
+
+    @if (OnDismiss.HasDelegate)
+    {
+        <button type="button" class="status-message__dismiss" aria-label="Dismiss notification" @onclick="OnDismiss">
+            <img src="assets/icons/close.svg" alt="" aria-hidden="true" />
+        </button>
+    }
+</div>

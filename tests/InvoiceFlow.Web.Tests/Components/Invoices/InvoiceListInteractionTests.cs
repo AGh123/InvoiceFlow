@@ -4,7 +4,6 @@ using InvoiceFlow.Application.Invoices.Abstractions;
 using InvoiceFlow.Application.Invoices.Dtos;
 using InvoiceFlow.Domain.Invoices;
 using InvoiceFlow.Web.Components.Invoices;
-using InvoiceFlow.Web.Components.Invoices.Components;
 using InvoiceFlow.Web.Components.Pages.Invoices;
 using InvoiceFlow.Web.Tests.TestDoubles;
 using Microsoft.AspNetCore.Components;
@@ -21,42 +20,51 @@ public class InvoiceListInteractionTests
     [InlineData("Invoice number", "INV-A,INV-B,INV-C")]
     public void SortMenu_PreservesExpectedOrdering(string option, string expected)
     {
-        using var context = Context(out _);
-        var cut = context.Render<InvoiceList>(parameters => parameters.Add(
-            component => component.Invoices, Invoices()));
+        using var context = Context(out var repository);
+        foreach (var summary in Invoices())
+        {
+            repository.Invoices.Add(new Invoice(summary.Id, summary.InvoiceNumber,
+                summary.CustomerName, summary.IssueDate, summary.CurrencyCode));
+        }
+        context.Services.AddSingleton<InvoiceNotificationState>();
+        var cut = context.Render<InvoiceListPage>();
+        Assert.Equal("Invoice list pagination", cut.Find("nav.invoice-list__pagination").GetAttribute("aria-label"));
         cut.Find("#invoice-sort").Click();
-        cut.FindAll(".sort-option").Single(item => item.TextContent.Contains(option)).Click();
+        cut.FindAll(".invoice-sort__option").Single(item => item.TextContent.Contains(option)).Click();
 
-        var actual = string.Join(',', cut.FindAll(".desktop-list tbody tr .invoice-link")
+        var actual = string.Join(',', cut.FindAll(".invoice-list__desktop tbody tr .invoice-list__link")
             .Select(link => link.TextContent.Trim()));
         Assert.Equal(expected, actual);
         Assert.Equal(option, cut.Find("#invoice-sort span").TextContent);
-        Assert.Single(cut.FindAll(".desktop-list table"));
-        Assert.Single(cut.FindAll(".mobile-list"));
-        Assert.Equal(3, cut.FindAll(".mobile-list .invoice-card").Count);
+        Assert.Single(cut.FindAll(".invoice-list__desktop table"));
+        Assert.Single(cut.FindAll(".invoice-list__mobile"));
+        Assert.Equal(3, cut.FindAll(".invoice-list__mobile .invoice-list__card").Count);
     }
 
     [Fact]
     public void InvoiceActions_OnlyOneMenuOpensAndContainsOpenAndDelete()
     {
         using var context = Context(out _);
-        var module = context.JSInterop.SetupModule("./js/floating-control.js");
+        var module = context.JSInterop.SetupModule("./Components/Invoices/InvoiceList/InvoiceActionsMenu/InvoiceActionsMenu.razor.js");
         module.Mode = JSRuntimeMode.Loose;
         var cut = context.Render<InvoiceList>(parameters => parameters.Add(
-            component => component.Invoices, Invoices()));
-        var triggers = cut.FindAll(".desktop-list .actions-trigger");
+            component => component.Result, Result(Invoices())));
+        var triggers = cut.FindAll(".invoice-list__desktop .invoice-actions__trigger");
 
         triggers[0].Click();
-        Assert.Single(cut.FindAll(".desktop-list .actions-menu"));
-        Assert.Equal("true", cut.FindAll(".desktop-list .actions-trigger")[0].GetAttribute("aria-expanded"));
-        Assert.Contains("Open invoice", cut.Find(".desktop-list .actions-menu").TextContent);
-        Assert.StartsWith("/invoices/", cut.Find(".desktop-list .actions-menu a").GetAttribute("href"));
-        Assert.Contains("Delete", cut.Find(".desktop-list .actions-menu").TextContent);
+        Assert.Single(cut.FindAll(".invoice-list__desktop .invoice-actions__menu"));
+        Assert.Equal(triggers[0].Id,
+            cut.Find(".invoice-list__desktop .invoice-actions__menu").GetAttribute("aria-labelledby"));
+        Assert.Equal(triggers.Count, triggers.Select(trigger => trigger.Id).Distinct().Count());
+        Assert.Equal("true", cut.FindAll(".invoice-list__desktop .invoice-actions__trigger")[0].GetAttribute("aria-expanded"));
+        Assert.Contains("Open invoice", cut.Find(".invoice-list__desktop .invoice-actions__menu").TextContent);
+        Assert.StartsWith("/invoices/", cut.Find(".invoice-list__desktop .invoice-actions__menu a").GetAttribute("href"));
+        Assert.Contains("Delete", cut.Find(".invoice-list__desktop .invoice-actions__menu").TextContent);
 
         triggers[1].Click();
-        Assert.Single(cut.FindAll(".desktop-list .actions-menu"));
-        Assert.Equal("false", cut.FindAll(".desktop-list .actions-trigger")[0].GetAttribute("aria-expanded"));
-        Assert.Equal("true", cut.FindAll(".desktop-list .actions-trigger")[1].GetAttribute("aria-expanded"));
+        Assert.Single(cut.FindAll(".invoice-list__desktop .invoice-actions__menu"));
+        Assert.Equal("false", cut.FindAll(".invoice-list__desktop .invoice-actions__trigger")[0].GetAttribute("aria-expanded"));
+        Assert.Equal("true", cut.FindAll(".invoice-list__desktop .invoice-actions__trigger")[1].GetAttribute("aria-expanded"));
         module.VerifyInvoke("unwatchOutside");
     }
 
@@ -64,7 +72,7 @@ public class InvoiceListInteractionTests
     public void InvoiceActions_ExternalOpenFalseUnwatchesOutsideListener()
     {
         using var context = Context(out _);
-        var module = context.JSInterop.SetupModule("./js/floating-control.js");
+        var module = context.JSInterop.SetupModule("./Components/Invoices/InvoiceList/InvoiceActionsMenu/InvoiceActionsMenu.razor.js");
         module.Mode = JSRuntimeMode.Loose;
         var invoice = Invoices()[0];
         var cut = context.Render<InvoiceActionsMenu>(parameters => parameters
@@ -77,7 +85,7 @@ public class InvoiceListInteractionTests
             .Add(component => component.Open, false));
 
         module.VerifyInvoke("unwatchOutside");
-        Assert.Equal("false", cut.Find(".actions-trigger").GetAttribute("aria-expanded"));
+        Assert.Equal("false", cut.Find(".invoice-actions__trigger").GetAttribute("aria-expanded"));
     }
 
     [Fact]
@@ -85,41 +93,34 @@ public class InvoiceListInteractionTests
     {
         using var context = Context(out var repository);
         var dialogModule = context.JSInterop.SetupModule(
-            "./Components/Invoices/Components/InvoiceDeleteDialog.razor.js");
+            "./js/dialog.js");
         dialogModule.Mode = JSRuntimeMode.Loose;
         var invoice = Invoices()[0];
         repository.Invoices.Add(new Invoice(invoice.Id, invoice.InvoiceNumber,
             invoice.CustomerName, invoice.IssueDate, invoice.CurrencyCode));
-        var invoices = new List<InvoiceSummaryDto> { invoice };
-        InvoiceSummaryDto? deleted = null;
-        var cut = context.Render<InvoiceList>(parameters => parameters
-            .Add(component => component.Invoices, invoices)
-            .Add(component => component.InvoiceDeleted, value =>
-            {
-                deleted = value;
-                invoices.RemoveAll(existing => existing.Id == value.Id);
-            }));
+        context.Services.AddSingleton<InvoiceNotificationState>();
+        var cut = context.Render<InvoiceListPage>();
 
-        cut.Find(".desktop-list .actions-trigger").Click();
-        cut.Find(".desktop-list .actions-menu button").Click();
+        cut.Find(".invoice-list__desktop .invoice-actions__trigger").Click();
+        cut.Find(".invoice-list__desktop .invoice-actions__menu button").Click();
         dialogModule.VerifyInvoke("showDialog");
-        Assert.Empty(cut.FindAll(".actions-menu"));
+        Assert.Empty(cut.FindAll(".invoice-actions__menu"));
         Assert.Contains("Delete invoice?", cut.Markup);
-        Assert.Contains(invoice.InvoiceNumber, cut.Find(".delete-dialog").TextContent);
-        Assert.Contains(invoice.CustomerName, cut.Find(".delete-dialog").TextContent);
+        Assert.Contains(invoice.InvoiceNumber, cut.Find(".invoice-delete-dialog").TextContent);
+        Assert.Contains(invoice.CustomerName, cut.Find(".invoice-delete-dialog").TextContent);
 
-        cut.Find(".delete-dialog .button-secondary").Click();
+        cut.Find(".invoice-delete-dialog .button--secondary").Click();
         dialogModule.VerifyInvoke("closeDialog");
         Assert.Single(repository.Invoices);
-        Assert.Null(deleted);
+        Assert.Single(cut.FindAll(".invoice-list__desktop .invoice-list__link"));
 
-        cut.Find(".desktop-list .actions-trigger").Click();
-        cut.Find(".desktop-list .actions-menu button").Click();
-        cut.Find(".delete-dialog .button-danger").Click();
+        cut.Find(".invoice-list__desktop .invoice-actions__trigger").Click();
+        cut.Find(".invoice-list__desktop .invoice-actions__menu button").Click();
+        cut.Find(".invoice-delete-dialog .button--danger").Click();
 
-        cut.WaitForAssertion(() => Assert.Equal(invoice.Id, deleted?.Id));
+        cut.WaitForAssertion(() => Assert.Contains("deleted successfully", cut.Markup));
         Assert.Empty(repository.Invoices);
-        Assert.Empty(cut.FindAll(".desktop-list .invoice-link"));
+        Assert.Empty(cut.FindAll(".invoice-list__desktop .invoice-list__link"));
     }
 
     [Fact]
@@ -134,17 +135,17 @@ public class InvoiceListInteractionTests
         var editor = context.Render<InvoiceEditorPage>(parameters => parameters
             .Add(component => component.Id, invoice.Id));
 
-        editor.Find(".final-actions .button-secondary").Click();
+        editor.Find(".invoice-editor__final-actions .button--secondary").Click();
         Assert.EndsWith("/invoices", context.Services.GetRequiredService<NavigationManager>().Uri);
         editor.Dispose();
 
         var summary = new InvoiceSummaryDto(invoice.Id, invoice.InvoiceNumber,
             invoice.CustomerName, invoice.IssueDate, invoice.CurrencyCode, 0m);
         var list = context.Render<InvoiceList>(parameters => parameters
-            .Add(component => component.Invoices, new[] { summary }));
-        list.Find(".desktop-list .actions-trigger").Click();
-        list.Find(".desktop-list .actions-menu button").Click();
-        list.Find(".delete-dialog .button-danger").Click();
+            .Add(component => component.Result, Result([summary])));
+        list.Find(".invoice-list__desktop .invoice-actions__trigger").Click();
+        list.Find(".invoice-list__desktop .invoice-actions__menu button").Click();
+        list.Find(".invoice-delete-dialog .button--danger").Click();
 
         list.WaitForAssertion(() => Assert.Empty(repository.Invoices));
     }
@@ -166,4 +167,8 @@ public class InvoiceListInteractionTests
         new(Guid.NewGuid(), "INV-B", "Zulu", new DateOnly(2026, 3, 1), "USD", 2m),
         new(Guid.NewGuid(), "INV-C", "Alpha", new DateOnly(2026, 2, 1), "CHF", 3m),
     ];
+
+    private static InvoiceListResultDto Result(IReadOnlyList<InvoiceSummaryDto> invoices) =>
+        new(invoices, invoices.Count, invoices.Count,
+            invoices.Count == 0 ? null : invoices.Max(invoice => invoice.IssueDate), 1);
 }

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using InvoiceFlow.Application.Invoices.Dtos;
 using InvoiceFlow.Application.Invoices.Requests;
+using InvoiceFlow.Domain.Invoices;
 
 namespace InvoiceFlow.Web.Components.Invoices.Models;
 
@@ -9,11 +10,11 @@ public sealed class InvoiceEditorModel
 {
     public string? GeneratedInvoiceNumber { get; set; }
     [Required(ErrorMessage = "Invoice number is required.")]
-    [MaxLength(50, ErrorMessage = "Invoice number must be 50 characters or fewer.")]
+    [MaxLength(InvoiceRules.InvoiceNumberMaxLength, ErrorMessage = "Invoice number must be 50 characters or fewer.")]
     public string InvoiceNumber { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Customer name is required.")]
-    [MaxLength(200, ErrorMessage = "Customer name must be 200 characters or fewer.")]
+    [MaxLength(InvoiceRules.CustomerNameMaxLength, ErrorMessage = "Customer name must be 200 characters or fewer.")]
     public string CustomerName { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Issue date is required.")]
@@ -27,11 +28,34 @@ public sealed class InvoiceEditorModel
 
     public List<InvoiceLineItemEditorModel> LineItems { get; set; } = [];
 
-    public decimal Subtotal => LineItems.Sum(lineItem => lineItem.GrossAmount);
+    public (decimal Subtotal, decimal TotalDiscount, decimal GrandTotal) CalculateTotals()
+    {
+        var subtotal = 0m;
+        var discount = 0m;
+        var grandTotal = 0m;
+        foreach (var lineItem in LineItems)
+        {
+            subtotal += lineItem.GrossAmount;
+            discount += lineItem.DiscountAmount;
+            grandTotal += lineItem.LineTotal;
+        }
 
-    public decimal TotalDiscount => LineItems.Sum(lineItem => lineItem.DiscountAmount);
+        return (subtotal, discount, grandTotal);
+    }
 
-    public decimal GrandTotal => LineItems.Sum(lineItem => lineItem.LineTotal);
+    public bool TryCalculateTotals(out (decimal Subtotal, decimal TotalDiscount, decimal GrandTotal) totals)
+    {
+        try
+        {
+            totals = CalculateTotals();
+            return true;
+        }
+        catch (OverflowException)
+        {
+            totals = default;
+            return false;
+        }
+    }
 
     public CreateInvoiceRequest ToCreateRequest() =>
         new(

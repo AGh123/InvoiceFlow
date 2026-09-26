@@ -1,0 +1,29 @@
+@namespace InvoiceFlow.Web.Components.Invoices
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="currency-combobox" @ref="_root">
+    <input id="currency-code" @ref="_input" type="text" class="@($"form-control currency-combobox__input{(Invalid ? " invalid" : "")}")" maxlength="3" autocomplete="off"
+           value="@_query" disabled="@Disabled" placeholder="USD" aria-required="true"
+           role="combobox" aria-autocomplete="list" aria-haspopup="listbox"
+           aria-invalid="@(Invalid ? "true" : null)"
+           aria-expanded="@(_open && Filtered.Count > 0 ? "true" : "false")"
+           aria-controls="@_listId" aria-activedescendant="@ActiveOptionId"
+           aria-describedby="currency-code-help currency-code-error"
+           @oninput="InputAsync" @onfocus="Open" @onclick="Open" @onkeydown="HandleKeyDownAsync" />
+    @if (_open && Filtered.Count > 0)
+    {
+        <div id="@_listId" class="floating-panel currency-combobox__options" role="listbox" aria-label="Common currencies">
+            @for (var index = 0; index < Filtered.Count; index++)
+            {
+                var option = Filtered[index];
+                <button id="@OptionId(index)" type="button" role="option" tabindex="-1"
+                        class="@($"currency-combobox__option{(index == _activeIndex ? " currency-combobox__option--active" : "")}")"
+                        aria-selected="@(option.Code == Value ? "true" : "false")"
+                        @onmousedown:preventDefault="true" @onclick="() => SelectAsync(option.Code)">
+                    <strong>@option.Code</strong><span>@option.Name</span>
+                </button>
+            }
+        </div>
+    }
+</div>

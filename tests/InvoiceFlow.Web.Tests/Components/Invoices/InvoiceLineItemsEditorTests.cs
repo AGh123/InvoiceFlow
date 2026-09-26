@@ -1,5 +1,5 @@
 using Bunit;
-using InvoiceFlow.Web.Components.Invoices.Components;
+using InvoiceFlow.Web.Components.Invoices;
 using InvoiceFlow.Web.Components.Invoices.Models;
 using Microsoft.AspNetCore.Components.Forms;
 
@@ -16,8 +16,8 @@ public class InvoiceLineItemsEditorTests
         var cut = Render(context, model);
 
         Assert.Contains("No line items yet", cut.Markup);
-        Assert.Single(cut.FindAll(".empty-line-items button"));
-        Assert.Empty(cut.FindAll(".discount-row"));
+        Assert.Single(cut.FindAll(".line-items-editor__empty button"));
+        Assert.Empty(cut.FindAll(".invoice-summary__row--discount"));
         Assert.Equal(2, cut.Markup.Split("$0.00").Length - 1);
     }
 
@@ -28,7 +28,7 @@ public class InvoiceLineItemsEditorTests
         var model = ValidModel();
 
         var cut = Render(context, model);
-        cut.Find(".empty-add-button").Click();
+        cut.Find(".line-items-editor__empty-add-button").Click();
 
         var added = Assert.Single(model.LineItems);
         Assert.Null(added.Id);
@@ -36,8 +36,8 @@ public class InvoiceLineItemsEditorTests
         Assert.Equal(1m, added.Quantity);
         Assert.Equal(0m, added.UnitPrice);
         Assert.Equal(0m, added.DiscountPercent);
-        Assert.Single(cut.FindAll(".add-item-button"));
-        Assert.Equal(4, cut.FindAll(".line-item-row input").Count);
+        Assert.Single(cut.FindAll(".line-items-editor__add-button"));
+        Assert.Equal(4, cut.FindAll(".line-items-editor__row input").Count);
     }
 
     [Fact]
@@ -52,6 +52,22 @@ public class InvoiceLineItemsEditorTests
         var numericInputs = cut.FindComponents<InputNumberOnInput<decimal>>();
         Assert.Equal(3, numericInputs.Count);
         Assert.All(numericInputs, input => Assert.True(input.Instance.SelectOnFocus));
+        Assert.All(cut.FindAll(".line-items-editor__row input"), input =>
+            Assert.Contains("form-control", input.GetAttribute("class")));
+    }
+
+    [Fact]
+    public void LineTotalAndSummary_UseSameFormattingForArbitraryCurrency()
+    {
+        using var context = new BunitContext();
+        var model = ValidModel();
+        model.CurrencyCode = "CHF";
+        model.LineItems.Add(Item("Service"));
+
+        var cut = Render(context, model);
+
+        Assert.Contains("CHF 10.00", cut.Find(".line-items-editor__total").TextContent);
+        Assert.Contains("CHF 10.00", cut.Find(".invoice-summary__row--total").TextContent);
     }
 
     [Fact]
@@ -65,7 +81,7 @@ public class InvoiceLineItemsEditorTests
         model.LineItems.AddRange([first, second, third]);
 
         var cut = Render(context, model);
-        cut.FindAll(".remove-item-button")[1].Click();
+        cut.FindAll(".line-items-editor__remove-button")[1].Click();
 
         Assert.Equal([first, third], model.LineItems);
         Assert.DoesNotContain("Second", cut.Markup);
@@ -81,11 +97,11 @@ public class InvoiceLineItemsEditorTests
         model.LineItems.Add(Item("Only item"));
 
         var cut = Render(context, model);
-        cut.Find(".remove-item-button").Click();
+        cut.Find(".line-items-editor__remove-button").Click();
 
         Assert.Empty(model.LineItems);
         Assert.Contains("No line items yet", cut.Markup);
-        Assert.Single(cut.FindAll(".empty-line-items button"));
+        Assert.Single(cut.FindAll(".line-items-editor__empty button"));
     }
 
     [Fact]

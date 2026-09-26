@@ -1,0 +1,56 @@
+@namespace InvoiceFlow.Web.Components.Pages.Invoices
+@page "/invoices/new"
+@page "/invoices/{Id:guid}"
+@implements IDisposable
+@inject InvoiceFlow.Application.Invoices.InvoiceService InvoiceService
+@inject InvoiceNotificationState NotificationState
+@inject NavigationManager NavigationManager
+@inject ILogger<InvoiceEditorPage> Logger
+
+<PageTitle>@PageTitleText · InvoiceFlow</PageTitle>
+
+@if (_isLoading)
+{
+    <section class="invoice-editor-page__state" aria-labelledby="loading-title">
+        <h1 id="loading-title" class="visually-hidden">Loading invoice</h1>
+        <div class="loading-state loading-state--editor" role="status" aria-live="polite">
+            <span class="loading-state__spinner" aria-hidden="true"></span>
+            <p>Loading invoice…</p>
+        </div>
+    </section>
+}
+else if (_notFound)
+{
+    <section class="invoice-editor-page__state invoice-editor-page__message">
+        <h1>Invoice not found</h1>
+        <p>The invoice may have been deleted or the link may no longer be valid.</p>
+        <a class="button button--primary" href="/invoices">Back to Invoices</a>
+    </section>
+}
+else if (_loadError)
+{
+    <section class="invoice-editor-page__state invoice-editor-page__message">
+        <h1>We couldn't load this invoice</h1>
+        <StatusMessage Kind="StatusMessageKind.Error"
+                       Message="The invoice couldn't be loaded."
+                       Detail="Something went wrong while loading the invoice. Try again."
+                       ActionText="Try Again"
+                       OnAction="LoadEditorAsync" />
+        <a class="button button--secondary" href="/invoices">Back to Invoices</a>
+    </section>
+}
+else if (_model is not null)
+{
+    <NavigationLock ConfirmExternalNavigation="@IsDirty" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
+    <InvoiceEditor @ref="_editor"
+                   Model="_model"
+                   InvoiceId="Id"
+                   IsSaving="_isSaving"
+                   ErrorMessage="@_saveError"
+                   OnSave="SaveAsync"
+                   OnCancel="Cancel"
+                   OnRetry="RetrySaveAsync"
+                   OnDelete="HandleDeleted"
+                   OnChanged="HandleEditorChanged" />
+    <UnsavedChangesDialog @ref="_discardDialog" OnDiscard="DiscardAndNavigate" />
+}

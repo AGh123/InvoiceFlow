@@ -30,7 +30,9 @@ The solution is split into four projects with clear responsibilities:
 - **Infrastructure** implements the repository with EF Core and SQLite, owns persistence configuration and migrations, and translates known provider-specific failures at the persistence boundary.
 - **Web** contains the Blazor UI, mutable editor models, validation, and local UI state. Components perform persistence operations only through `InvoiceService`.
 
-Tests are organized by the same boundaries: Domain unit tests, Application service tests, Infrastructure integration tests, and Web component/page tests.
+Tests follow the same boundaries: Domain unit tests, Application service tests, Infrastructure integration tests, and Web component/page tests. A small Playwright suite exercises browser behavior that bUnit cannot run.
+
+Web components are grouped by invoice editor, invoice list, shared controls, layout, and pages. Components with substantial lifecycle or interaction logic keep markup in `.razor` and C# in `.razor.cs`; browser behavior lives in collocated `.razor.js` modules, with generic focus, outside-interaction, and dialog helpers under `wwwroot/js`.
 
 ## Domain model
 
@@ -48,6 +50,8 @@ InvoiceFlow uses Blazor Interactive Server. UI components run on the server and 
 
 Editor validation provides immediate, field-level feedback, while Domain validation remains authoritative for business rules. A known SQLite uniqueness failure for an invoice number is translated into a provider-neutral Application exception and displayed by the Web UI as a field-level validation error. Unexpected persistence failures produce a generic user-safe message rather than exposing implementation details.
 
+Quantity, unit price, and discount validation follows the Domain's storage ranges and decimal scales. The complete invoice is also checked before saving so its calculated monetary totals remain representable by `System.Decimal`.
+
 ## Persistence
 
 InvoiceFlow uses a local SQLite database at:
@@ -57,6 +61,10 @@ src/InvoiceFlow.Web/App_Data/invoiceflow.db
 ```
 
 The path is relative to the Web application's content root. The application creates the directory as needed and applies EF Core migrations during startup, so no external database server is required. Generated SQLite database files are excluded from source control.
+
+Startup migrations are intended for this self-contained local setup. A production deployment should apply source-controlled migrations in a separate deployment step before starting application instances.
+
+The invoice list counts, filters, sorts, and pages invoice headers in SQLite. It loads line items only for the current page and calculates displayed totals with the Domain calculation. The search field waits briefly after typing before issuing a query. SQLite's built-in case-insensitive search and ordering apply to ASCII characters.
 
 Generated invoice numbers use a persisted SQLite sequence reservation. The invoice-number unique index remains the final protection against collisions, including manually entered numbers.
 
@@ -107,9 +115,21 @@ The solution has automated tests across four projects:
 - `InvoiceFlow.IntegrationTests` covers EF Core and SQLite persistence behavior.
 - `InvoiceFlow.Web.Tests` uses bUnit to cover component and page behavior.
 
+Browser tests use Playwright against a published Web application. After publishing to `.tmp-publish` and installing the browser dependencies, run:
+
+```shell
+dotnet publish src/InvoiceFlow.Web/InvoiceFlow.Web.csproj --configuration Release --output ./.tmp-publish
+npm ci --prefix tests/browser
+cd tests/browser
+npx playwright install chromium
+npm test
+```
+
+On Windows, an installed Microsoft Edge can be used with `PLAYWRIGHT_BROWSER_CHANNEL=msedge`. The suite covers dialog focus, unsaved navigation, keyboard controls, outside interaction, and a desktop/mobile create/edit/delete path.
+
 ## CI
 
-The GitHub Actions CI workflow restores dependencies, builds and tests the solution in Release configuration, publishes the Web application, and uploads the published output as the `invoiceflow-web` workflow artifact. It does not deploy to an external environment.
+The GitHub Actions CI workflow restores dependencies, builds and tests the solution in Release configuration, verifies formatting, publishes the Web application, checks the published DLL, uploads the `invoiceflow-web` artifact, and runs the Playwright browser suite. It does not deploy to an external environment.
 
 ## Project structure
 
@@ -125,6 +145,7 @@ tests/
   InvoiceFlow.Application.Tests/
   InvoiceFlow.IntegrationTests/
   InvoiceFlow.Web.Tests/
+  browser/
 ```
 
 ## Design notes and trade-offs

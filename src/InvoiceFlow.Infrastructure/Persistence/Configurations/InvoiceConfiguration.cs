@@ -16,21 +16,21 @@ public sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .ValueGeneratedNever();
 
         builder.Property(invoice => invoice.InvoiceNumber)
-            .HasMaxLength(50)
+            .HasMaxLength(InvoiceRules.InvoiceNumberMaxLength)
             .IsRequired();
 
         builder.HasIndex(invoice => invoice.InvoiceNumber)
             .IsUnique();
 
         builder.Property(invoice => invoice.CustomerName)
-            .HasMaxLength(200)
+            .HasMaxLength(InvoiceRules.CustomerNameMaxLength)
             .IsRequired();
 
         builder.Property(invoice => invoice.IssueDate)
             .IsRequired();
 
         builder.Property(invoice => invoice.CurrencyCode)
-            .HasMaxLength(3)
+            .HasMaxLength(InvoiceRules.CurrencyCodeLength)
             .IsFixedLength()
             .IsRequired();
 

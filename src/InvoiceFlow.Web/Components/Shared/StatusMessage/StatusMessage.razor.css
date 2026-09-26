@@ -1,0 +1,111 @@
+.status-message {
+    align-items: flex-start;
+    border: 1px solid;
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-floating);
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    width: 100%;
+}
+
+.status-message--success {
+    background: var(--color-success-soft);
+    border-color: var(--color-success-border);
+    color: var(--color-success-dark);
+}
+
+.status-message--error {
+    background: var(--color-danger-soft);
+    border-color: var(--color-danger-border);
+    color: var(--color-danger-text);
+}
+
+.status-message__icon {
+    display: block;
+    flex: 0 0 auto;
+}
+
+.status-message__copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.status-message__title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.status-message--success .status-message__title {
+    font-weight: 500;
+}
+
+.status-message__detail,
+.status-message__action {
+    font-size: 0.75rem;
+}
+
+.status-message__detail {
+    line-height: 1.4;
+}
+
+.status-message__action {
+    align-self: flex-start;
+    background: transparent;
+    border: 0;
+    color: var(--color-primary);
+    font-weight: 600;
+    margin-top: var(--space-1);
+    padding: 0;
+}
+
+.status-message__dismiss {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-icon);
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 1.25rem;
+    justify-content: center;
+    padding: 0;
+    width: 1.25rem;
+}
+
+.status-message__dismiss img {
+    display: block;
+}
+
+.status-message--floating {
+    max-width: 22.375rem;
+    position: fixed;
+    right: var(--space-6);
+    bottom: var(--space-6);
+    top: auto;
+    z-index: 50;
+}
+
+@media (max-width: 48rem) {
+    .status-message__action {
+        min-height: 2.75rem;
+        padding: 0 var(--space-2);
+    }
+
+    .status-message--floating {
+        left: var(--space-4);
+        max-width: none;
+        right: var(--space-4);
+        bottom: var(--space-4);
+        top: auto;
+        width: auto;
+    }
+
+    .status-message__dismiss {
+        height: 2.75rem;
+        margin: -0.75rem;
+        width: 2.75rem;
+    }
+}

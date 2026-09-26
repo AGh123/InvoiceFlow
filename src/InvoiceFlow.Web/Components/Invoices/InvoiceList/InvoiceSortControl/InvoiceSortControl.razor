@@ -1,0 +1,30 @@
+@namespace InvoiceFlow.Web.Components.Invoices
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="invoice-sort" @ref="_root">
+    <button id="invoice-sort" @ref="_trigger" type="button" class="invoice-sort__trigger"
+            aria-labelledby="invoice-sort-label invoice-sort"
+            aria-haspopup="listbox" aria-expanded="@_open.ToString().ToLowerInvariant()"
+            aria-controls="@_listId" @onclick="ToggleAsync" @onkeydown="TriggerKeyDownAsync">
+        <span>@Options.First(option => option.Key == Value).Label</span>
+        <img src="assets/icons/chevron-down-desktop.svg" alt="" aria-hidden="true" />
+    </button>
+    @if (_open)
+    {
+        <div id="@_listId" class="floating-panel invoice-sort__menu" role="listbox" aria-label="Sort invoices">
+            @for (var index = 0; index < Options.Length; index++)
+            {
+                var option = Options[index];
+                var optionIndex = index;
+                <button id="@OptionId(index)" type="button" role="option" tabindex="@(index == _activeIndex ? 0 : -1)"
+                        class="@($"invoice-sort__option{(index == _activeIndex ? " invoice-sort__option--active" : "")}")"
+                        aria-selected="@(option.Key == Value ? "true" : "false")"
+                        @onclick="() => SelectAsync(option.Key)"
+                        @onkeydown="args => OptionKeyDownAsync(args, optionIndex)">
+                    @option.Label <span aria-hidden="true">@(option.Key == Value ? "✓" : "")</span>
+                </button>
+            }
+        </div>
+    }
+</div>

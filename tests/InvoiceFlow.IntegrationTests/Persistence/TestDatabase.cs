@@ -27,7 +27,7 @@ internal sealed class TestDatabase : IAsyncDisposable
     public IDbContextFactory<InvoiceFlowDbContext> DbContextFactory =>
         _services.GetRequiredService<IDbContextFactory<InvoiceFlowDbContext>>();
 
-    public static async Task<TestDatabase> CreateAsync()
+    public static async Task<TestDatabase> CreateAsync(string? targetMigration = null)
     {
         var directoryPath = Path.Combine(
             Path.GetTempPath(),
@@ -41,7 +41,17 @@ internal sealed class TestDatabase : IAsyncDisposable
 
         try
         {
-            await serviceProvider.ApplyDatabaseMigrationsAsync();
+            if (targetMigration is null)
+            {
+                await serviceProvider.ApplyDatabaseMigrationsAsync();
+            }
+            else
+            {
+                await using var dbContext = await serviceProvider
+                    .GetRequiredService<IDbContextFactory<InvoiceFlowDbContext>>()
+                    .CreateDbContextAsync();
+                await dbContext.Database.MigrateAsync(targetMigration);
+            }
             return new TestDatabase(serviceProvider, directoryPath, databasePath);
         }
         catch

@@ -1,0 +1,73 @@
+.invoice-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    margin: 0 auto;
+    max-width: var(--content-max-width);
+    padding: var(--space-10) 0 var(--space-15);
+    width: calc(100% - 5rem);
+}
+
+.invoice-page--empty {
+    gap: var(--space-10);
+}
+
+.invoice-page__title-row {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.invoice-page__title-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.invoice-page__title-group h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.invoice-page__title-group p {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+}
+
+.invoice-page__new-button picture,
+.invoice-page__new-button img {
+    display: block;
+}
+
+@media (max-width: 48rem) {
+    .invoice-page {
+        gap: var(--space-5);
+        padding: var(--space-4) 0 var(--space-10);
+        width: calc(100% - 2rem);
+    }
+
+    .invoice-page--empty {
+        gap: var(--space-10);
+    }
+
+    .invoice-page__title-row {
+        align-items: stretch;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .invoice-page__title-group h1 {
+        font-size: 1.5rem;
+    }
+
+    .invoice-page__title-group p {
+        font-size: 0.8125rem;
+    }
+
+    .invoice-page__new-button {
+        width: 100%;
+    }
+}

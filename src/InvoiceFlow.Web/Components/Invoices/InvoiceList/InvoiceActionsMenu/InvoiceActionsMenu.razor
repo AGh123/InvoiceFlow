@@ -1,0 +1,24 @@
+@namespace InvoiceFlow.Web.Components.Invoices
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="invoice-actions" @ref="_root">
+    <button id="@_triggerId" type="button" class="invoice-actions__trigger" @ref="_trigger"
+            aria-label="@($"Actions for invoice {Invoice.InvoiceNumber}")"
+            aria-haspopup="menu" aria-expanded="@Open.ToString().ToLowerInvariant()"
+            aria-controls="@_menuId" @onclick="ToggleAsync" @onkeydown="TriggerKeyDownAsync">
+        <img src="assets/icons/more-ellipsis.svg" alt="" aria-hidden="true" />
+    </button>
+    @if (Open)
+    {
+        <div id="@_menuId" class="floating-panel invoice-actions__menu" role="menu"
+             aria-labelledby="@_triggerId" @ref="_menu">
+            <a id="@($"{_menuId}-open")" role="menuitem" href="@($"/invoices/{Invoice.Id}")"
+               tabindex="@(_activeIndex == 0 ? 0 : -1)" @onclick="CloseForNavigation"
+               @onkeydown="args => MenuKeyDownAsync(args, 0)">Open invoice</a>
+            <button id="@($"{_menuId}-delete")" type="button" role="menuitem"
+                    tabindex="@(_activeIndex == 1 ? 0 : -1)" @onclick="DeleteAsync"
+                    @onkeydown="args => MenuKeyDownAsync(args, 1)">Delete</button>
+        </div>
+    }
+</div>

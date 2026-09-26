@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using InvoiceFlow.Application.Invoices.Dtos;
+using InvoiceFlow.Domain.Invoices;
 using InvoiceFlow.Web.Components.Invoices.Models;
 
 namespace InvoiceFlow.Web.Tests.Models;
@@ -21,9 +22,7 @@ public class InvoiceEditorModelTests
         Assert.True(model.IssueDate == dateBeforeConstruction || model.IssueDate == dateAfterConstruction);
         Assert.Empty(model.LineItems);
         Assert.Empty(Validate(model));
-        Assert.Equal(0m, model.Subtotal);
-        Assert.Equal(0m, model.TotalDiscount);
-        Assert.Equal(0m, model.GrandTotal);
+        Assert.Equal((0m, 0m, 0m), model.CalculateTotals());
     }
 
     [Fact]
@@ -89,9 +88,24 @@ public class InvoiceEditorModelTests
             new() { Description = "B", Quantity = 1.5m, UnitPrice = 20m, DiscountPercent = 50m },
         ]);
 
-        Assert.Equal(130m, model.Subtotal);
-        Assert.Equal(25m, model.TotalDiscount);
-        Assert.Equal(105m, model.GrandTotal);
+        Assert.Equal((130m, 25m, 105m), model.CalculateTotals());
+    }
+
+    [Fact]
+    public void TryCalculateTotals_ReturnsFalseWhenValidLineItemsOverflowAggregate()
+    {
+        var model = ValidModel();
+        for (var index = 0; index < 8; index++)
+        {
+            model.LineItems.Add(new InvoiceLineItemEditorModel
+            {
+                Description = "Maximum",
+                Quantity = InvoiceRules.MaximumQuantity,
+                UnitPrice = InvoiceRules.MaximumUnitPrice,
+            });
+        }
+
+        Assert.False(model.TryCalculateTotals(out _));
     }
 
     [Theory]

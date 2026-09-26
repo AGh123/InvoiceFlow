@@ -22,7 +22,7 @@ public class InvoiceEditorPageTests
 
         Assert.Contains("New Invoice", cut.Markup);
         Assert.Contains("No line items yet", cut.Markup);
-        Assert.Empty(cut.FindAll(".danger-zone"));
+        Assert.Empty(cut.FindAll(".invoice-editor__danger-zone"));
         Assert.Matches(@"^INV-\d{4}-\d{6}$", cut.Find("#invoice-number").GetAttribute("value")!);
     }
 
@@ -87,7 +87,7 @@ public class InvoiceEditorPageTests
 
         cut.WaitForAssertion(() => Assert.Equal(1, repository.UpdateCallCount));
         Assert.Equal(invoice.Id, repository.LastUpdated!.Id);
-        Assert.Equal(2, repository.GetByIdCallCount);
+        Assert.Equal(1, repository.GetByIdCallCount);
         cut.WaitForAssertion(() => Assert.EndsWith(
             "/invoices",
             context.Services.GetRequiredService<NavigationManager>().Uri));
@@ -110,8 +110,8 @@ public class InvoiceEditorPageTests
         Assert.DoesNotContain("UNIQUE constraint", cut.Markup);
         Assert.Equal("INV-DUP", cut.Find("#invoice-number").GetAttribute("value"));
         Assert.EndsWith("/", context.Services.GetRequiredService<NavigationManager>().Uri);
-        cut.Find(".final-actions .button-secondary").Click();
-        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".discard-dialog").GetAttribute("data-open")));
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".unsaved-dialog").GetAttribute("data-open")));
     }
 
     [Fact]
@@ -129,8 +129,8 @@ public class InvoiceEditorPageTests
         Assert.DoesNotContain("provider failure", cut.Markup);
         Assert.Equal("INV-KEEP", cut.Find("#invoice-number").GetAttribute("value"));
         Assert.Equal("Still Here", cut.Find("#customer-name").GetAttribute("value"));
-        cut.Find(".final-actions .button-secondary").Click();
-        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".discard-dialog").GetAttribute("data-open")));
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".unsaved-dialog").GetAttribute("data-open")));
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public class InvoiceEditorPageTests
         cut.Find("form").Submit();
 
         cut.WaitForAssertion(() => Assert.Equal(shownNumber, repository.LastAdded?.InvoiceNumber));
-        Assert.Equal(0, repository.GetAllCallCount);
+        Assert.Equal(0, repository.GetPageCallCount);
         Assert.Single(repository.Invoices);
     }
 
@@ -153,24 +153,41 @@ public class InvoiceEditorPageTests
     {
         using var context = CreateContext(out _);
         var cut = context.Render<InvoiceEditorPage>();
-        cut.Find(".final-actions .button-secondary").Click();
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
 
         Assert.EndsWith("/invoices", context.Services.GetRequiredService<NavigationManager>().Uri);
-        Assert.Equal("false", cut.Find(".discard-dialog").GetAttribute("data-open"));
+        Assert.Equal("false", cut.Find(".unsaved-dialog").GetAttribute("data-open"));
+    }
+
+    [Fact]
+    public void InvalidSubmitWithoutEdits_DoesNotMarkNewEditorDirty()
+    {
+        using var context = CreateContext(out _);
+        var cut = context.Render<InvoiceEditorPage>();
+        cut.Find("form").Submit();
+        Assert.Contains("Customer name is required.", cut.Markup);
+
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
+
+        Assert.EndsWith("/invoices", context.Services.GetRequiredService<NavigationManager>().Uri);
+        Assert.Equal("false", cut.Find(".unsaved-dialog").GetAttribute("data-open"));
     }
 
     [Fact]
     public void DirtyEditor_AsksBeforeNavigationAndKeepEditingPreservesInput()
     {
         using var context = CreateContext(out _);
+        var dialogModule = context.JSInterop.SetupModule("./js/dialog.js");
         var cut = context.Render<InvoiceEditorPage>();
         cut.Find("#customer-name").Input("Changed customer");
-        cut.Find(".final-actions .button-secondary").Click();
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
 
-        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".discard-dialog").GetAttribute("data-open")));
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".unsaved-dialog").GetAttribute("data-open")));
+        dialogModule.VerifyInvoke("showDialog");
         Assert.Equal("Changed customer", cut.Find("#customer-name").GetAttribute("value"));
-        cut.Find(".discard-actions .button-secondary").Click();
-        Assert.Equal("false", cut.Find(".discard-dialog").GetAttribute("data-open"));
+        cut.Find(".unsaved-dialog__actions .button--secondary").Click();
+        dialogModule.VerifyInvoke("closeDialog");
+        Assert.Equal("false", cut.Find(".unsaved-dialog").GetAttribute("data-open"));
         Assert.DoesNotContain("/invoices", context.Services.GetRequiredService<NavigationManager>().Uri);
     }
 
@@ -179,11 +196,11 @@ public class InvoiceEditorPageTests
     {
         using var context = CreateContext(out _);
         var cut = context.Render<InvoiceEditorPage>();
-        cut.Find(".empty-add-button").Click();
-        cut.Find(".final-actions .button-secondary").Click();
+        cut.Find(".line-items-editor__empty-add-button").Click();
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
 
-        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".discard-dialog").GetAttribute("data-open")));
-        cut.Find(".discard-actions .button-danger").Click();
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".unsaved-dialog").GetAttribute("data-open")));
+        cut.Find(".unsaved-dialog__actions .button--danger").Click();
         cut.WaitForAssertion(() => Assert.EndsWith(
             "/invoices", context.Services.GetRequiredService<NavigationManager>().Uri));
     }
@@ -195,13 +212,13 @@ public class InvoiceEditorPageTests
         var invoice = Invoice();
         repository.Invoices.Add(invoice);
         var cut = context.Render<InvoiceEditorPage>(parameters => parameters.Add(component => component.Id, invoice.Id));
-        Assert.Equal("false", cut.Find(".discard-dialog").GetAttribute("data-open"));
+        Assert.Equal("false", cut.Find(".unsaved-dialog").GetAttribute("data-open"));
 
         cut.Find("#issue-date").Click();
         cut.Find("[aria-label='Thursday, September 24, 2026']").Click();
-        cut.Find(".final-actions .button-secondary").Click();
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
 
-        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".discard-dialog").GetAttribute("data-open")));
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".unsaved-dialog").GetAttribute("data-open")));
     }
 
     [Fact]
@@ -212,10 +229,10 @@ public class InvoiceEditorPageTests
         repository.Invoices.Add(invoice);
         var cut = context.Render<InvoiceEditorPage>(parameters => parameters.Add(component => component.Id, invoice.Id));
 
-        cut.Find(".final-actions .button-secondary").Click();
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
 
         Assert.EndsWith("/invoices", context.Services.GetRequiredService<NavigationManager>().Uri);
-        Assert.Equal("false", cut.Find(".discard-dialog").GetAttribute("data-open"));
+        Assert.Equal("false", cut.Find(".unsaved-dialog").GetAttribute("data-open"));
     }
 
     [Fact]
@@ -227,9 +244,9 @@ public class InvoiceEditorPageTests
         cut.Find("form").Submit();
         Assert.Contains("Customer name is required.", cut.Markup);
 
-        cut.Find(".final-actions .button-secondary").Click();
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
 
-        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".discard-dialog").GetAttribute("data-open")));
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".unsaved-dialog").GetAttribute("data-open")));
         Assert.Equal("CHF", cut.Find("#currency-code").GetAttribute("value"));
     }
 
@@ -241,14 +258,14 @@ public class InvoiceEditorPageTests
         invoice.AddLineItem(Guid.NewGuid(), "Original", 1m, 10m, 0m);
         repository.Invoices.Add(invoice);
         var cut = context.Render<InvoiceEditorPage>(parameters => parameters.Add(component => component.Id, invoice.Id));
-        cut.Find(".description-field input").Input("Changed");
-        cut.Find(".final-actions .button-secondary").Click();
-        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".discard-dialog").GetAttribute("data-open")));
-        cut.Find(".discard-actions .button-secondary").Click();
+        cut.Find(".line-items-editor__field--description input").Input("Changed");
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".unsaved-dialog").GetAttribute("data-open")));
+        cut.Find(".unsaved-dialog__actions .button--secondary").Click();
 
-        cut.Find(".remove-item-button").Click();
-        cut.Find(".final-actions .button-secondary").Click();
-        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".discard-dialog").GetAttribute("data-open")));
+        cut.Find(".line-items-editor__remove-button").Click();
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".unsaved-dialog").GetAttribute("data-open")));
     }
 
     [Fact]
@@ -260,10 +277,10 @@ public class InvoiceEditorPageTests
         repository.Invoices.Add(invoice);
         var cut = context.Render<InvoiceEditorPage>(parameters => parameters.Add(component => component.Id, invoice.Id));
 
-        cut.Find(".remove-item-button").Click();
-        cut.Find(".final-actions .button-secondary").Click();
+        cut.Find(".line-items-editor__remove-button").Click();
+        cut.Find(".invoice-editor__final-actions .button--secondary").Click();
 
-        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".discard-dialog").GetAttribute("data-open")));
+        cut.WaitForAssertion(() => Assert.Equal("true", cut.Find(".unsaved-dialog").GetAttribute("data-open")));
     }
 
     private static BunitContext CreateContext(out FakeInvoiceRepository repository)

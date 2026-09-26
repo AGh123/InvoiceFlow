@@ -1,0 +1,56 @@
+@namespace InvoiceFlow.Web.Components.Invoices
+@typeparam TValue
+@inherits InputNumber<TValue>
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<input @attributes="AdditionalAttributes"
+       @ref="_input"
+       type="number"
+       class="@CssClass"
+       @bind="CurrentValueAsString"
+       @bind:event="oninput" />
+
+@code {
+    private ElementReference _input;
+    private IJSObjectReference? _module;
+    private bool _selectOnFocusInstalled;
+
+    [Parameter]
+    public bool SelectOnFocus { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (SelectOnFocus && !_selectOnFocusInstalled)
+        {
+            _module ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./Components/Invoices/InputNumberOnInput/InputNumberOnInput.razor.js");
+            await _module.InvokeVoidAsync("selectOnFocus", _input);
+            _selectOnFocusInstalled = true;
+        }
+        else if (!SelectOnFocus && _selectOnFocusInstalled && _module is not null)
+        {
+            await _module.InvokeVoidAsync("uninstallSelectOnFocus", _input);
+            _selectOnFocusInstalled = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            try
+            {
+                if (_selectOnFocusInstalled)
+                {
+                    await _module.InvokeVoidAsync("uninstallSelectOnFocus", _input);
+                }
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit has already disconnected.
+            }
+        }
+    }
+}

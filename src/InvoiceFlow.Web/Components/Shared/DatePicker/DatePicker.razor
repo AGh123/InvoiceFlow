@@ -1,0 +1,52 @@
+@namespace InvoiceFlow.Web.Components.Shared
+@using System.Globalization
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="date-picker" @ref="_root">
+    <button id="@Id" type="button" role="combobox" class="@($"date-picker__trigger{(Invalid ? " invalid" : "")}")" disabled="@Disabled"
+            aria-labelledby="@LabelId" aria-required="true" aria-haspopup="dialog" aria-controls="@($"{_instanceId}-popup")"
+            aria-invalid="@(Invalid ? "true" : null)" aria-describedby="@DescribedBy"
+            aria-expanded="@_open.ToString().ToLowerInvariant()" @ref="_trigger"
+            @onclick="ToggleAsync">
+        <span>@Value.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)</span>
+        <img src="assets/icons/calendar-desktop.svg" alt="" aria-hidden="true" />
+    </button>
+    @if (_open)
+    {
+        <div id="@($"{_instanceId}-popup")" class="floating-panel date-picker__popover" role="dialog" aria-label="Choose date" @onkeydown="HandlePopupKeyDown">
+            <div class="date-picker__header">
+                <button type="button" aria-label="Previous month" @onclick="() => MoveMonth(-1)">‹</button>
+                <strong>@_viewMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture)</strong>
+                <button type="button" aria-label="Next month" @onclick="() => MoveMonth(1)">›</button>
+            </div>
+            <div class="date-picker__grid" role="grid" aria-label="@_viewMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture)">
+                <div class="date-picker__row" role="row">
+                    @foreach (var day in new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" })
+                    {
+                        <span role="columnheader">@day</span>
+                    }
+                </div>
+                @for (var week = 0; week < 6; week++)
+                {
+                    <div class="date-picker__row" role="row">
+                        @for (var dayIndex = 0; dayIndex < 7; dayIndex++)
+                        {
+                            var date = FirstGridDate.AddDays(week * 7 + dayIndex);
+                            <button id="@DayId(date)" type="button" role="gridcell"
+                                    class="@DayClass(date)" tabindex="@(date == _focusedDate ? 0 : -1)"
+                                    aria-label="@date.ToString("dddd, MMMM d, yyyy", CultureInfo.InvariantCulture)"
+                                    aria-selected="@(date == Value ? "true" : "false")"
+                                    aria-current="@(date == DateOnly.FromDateTime(DateTime.Today) ? "date" : null)"
+                                    @onclick="() => SelectAsync(date)"
+                                    @onkeydown="eventArgs => HandleDayKeyDown(eventArgs, date)">
+                                @date.Day
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+            <button type="button" class="date-picker__today" @onclick="() => SelectAsync(DateOnly.FromDateTime(DateTime.Today))">Today</button>
+        </div>
+    }
+</div>

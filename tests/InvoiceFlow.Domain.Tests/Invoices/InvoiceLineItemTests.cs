@@ -378,4 +378,47 @@ public class InvoiceLineItemTests
         Assert.Equal(100m, lineItem.UnitPrice);
         Assert.Equal(5m, lineItem.DiscountPercent);
     }
+
+    [Fact]
+    public void Description_AtMaximumLengthIsAcceptedAndLongerValueIsRejected()
+    {
+        var item = new InvoiceLineItem(Guid.NewGuid(), Guid.NewGuid(),
+            new string('D', InvoiceRules.LineItemDescriptionMaxLength), 1m, 1m, 0m);
+
+        Assert.Equal(InvoiceRules.LineItemDescriptionMaxLength, item.Description.Length);
+        Assert.Throws<ArgumentException>(() => item.UpdateDetails(
+            new string('D', InvoiceRules.LineItemDescriptionMaxLength + 1), 1m, 1m, 0m));
+    }
+
+    [Fact]
+    public void NumericStorageBoundaries_AreEnforced()
+    {
+        var item = CreateLineItem(InvoiceRules.MaximumQuantity, InvoiceRules.MaximumUnitPrice, 100m);
+
+        Assert.Equal(InvoiceRules.MaximumQuantity * InvoiceRules.MaximumUnitPrice, item.CalculateGrossAmount());
+        Assert.Equal(item.CalculateGrossAmount(), item.CalculateDiscountAmount());
+        Assert.Equal(0m, item.CalculateLineTotal());
+        item.UpdateDetails("Consulting", InvoiceRules.MaximumQuantity,
+            InvoiceRules.MaximumUnitPrice, 99.99m);
+        Assert.InRange(item.CalculateDiscountAmount(), 0m, item.CalculateGrossAmount());
+        Assert.True(item.CalculateLineTotal() > 0m);
+        Assert.Throws<ArgumentOutOfRangeException>(() => item.UpdateDetails("Description",
+            InvoiceRules.MaximumQuantity + 0.0001m, 1m, 0m));
+        Assert.Throws<ArgumentOutOfRangeException>(() => item.UpdateDetails("Description", 1m,
+            InvoiceRules.MaximumUnitPrice + 0.0001m, 0m));
+        Assert.Throws<ArgumentOutOfRangeException>(() => item.UpdateDetails("Description", 0.00001m, 1m, 0m));
+        Assert.Throws<ArgumentOutOfRangeException>(() => item.UpdateDetails("Description", 1m, 0.00001m, 0m));
+        Assert.Throws<ArgumentOutOfRangeException>(() => item.UpdateDetails("Description", 1m, 1m, 0.001m));
+        Assert.Equal(InvoiceRules.MaximumQuantity, item.Quantity);
+    }
+
+    [Fact]
+    public void ValuesAbovePreviousCeilingRemainValid()
+    {
+        var item = CreateLineItem(1000000000m, 1000000000m, 12.34m);
+
+        Assert.Equal(1000000000000000000m, item.CalculateGrossAmount());
+        Assert.Equal(123400000000000000m, item.CalculateDiscountAmount());
+        Assert.Equal(876600000000000000m, item.CalculateLineTotal());
+    }
 }

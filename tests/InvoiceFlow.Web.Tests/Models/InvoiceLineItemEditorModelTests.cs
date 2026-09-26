@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using InvoiceFlow.Domain.Invoices;
 using InvoiceFlow.Web.Components.Invoices.Models;
 
 namespace InvoiceFlow.Web.Tests.Models;
@@ -67,6 +68,61 @@ public class InvoiceLineItemEditorModelTests
         };
 
         Assert.Empty(Validate(model));
+    }
+
+    [Fact]
+    public void Validation_RejectsExcessNumericScaleAndValuesAboveStorageMaximum()
+    {
+        var model = new InvoiceLineItemEditorModel
+        {
+            Description = "Item",
+            Quantity = 1.00001m,
+            UnitPrice = InvoiceRules.MaximumUnitPrice + 0.0001m,
+            DiscountPercent = 1.001m,
+        };
+
+        var messages = Validate(model);
+
+        Assert.Contains(messages, result => result.MemberNames.Contains(nameof(model.Quantity)) &&
+            result.ErrorMessage!.Contains("4 decimal places", StringComparison.Ordinal));
+        Assert.Contains(messages, result => result.MemberNames.Contains(nameof(model.UnitPrice)) &&
+            result.ErrorMessage!.Contains("at most", StringComparison.Ordinal));
+        Assert.Contains(messages, result => result.MemberNames.Contains(nameof(model.DiscountPercent)) &&
+            result.ErrorMessage!.Contains("2 decimal places", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validation_RejectsQuantityAboveMaximumAndExcessUnitPriceScale()
+    {
+        var model = new InvoiceLineItemEditorModel
+        {
+            Description = "Item",
+            Quantity = InvoiceRules.MaximumQuantity + 0.0001m,
+            UnitPrice = 1.00001m,
+        };
+
+        var messages = Validate(model);
+
+        Assert.Contains(messages, result => result.MemberNames.Contains(nameof(model.Quantity)));
+        Assert.Contains(messages, result => result.MemberNames.Contains(nameof(model.UnitPrice)) &&
+            result.ErrorMessage!.Contains("4 decimal places", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MaximumStoredValues_AreValidAndDiscountCalculationDoesNotOverflow()
+    {
+        var model = new InvoiceLineItemEditorModel
+        {
+            Description = "Maximum",
+            Quantity = InvoiceRules.MaximumQuantity,
+            UnitPrice = InvoiceRules.MaximumUnitPrice,
+            DiscountPercent = InvoiceRules.MaximumDiscountPercent,
+        };
+
+        Assert.Empty(Validate(model));
+        Assert.Equal(model.GrossAmount, model.DiscountAmount);
+        Assert.True(model.TryCalculateLineTotal(out var lineTotal));
+        Assert.Equal(0m, lineTotal);
     }
 
     private static List<ValidationResult> Validate(object model)

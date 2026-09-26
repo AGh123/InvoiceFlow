@@ -6,6 +6,9 @@ namespace InvoiceFlow.Infrastructure.Persistence.Configurations;
 
 public sealed class InvoiceLineItemConfiguration : IEntityTypeConfiguration<InvoiceLineItem>
 {
+    private const int AmountPrecision = 18;
+    private const int DiscountPrecision = 5;
+
     public void Configure(EntityTypeBuilder<InvoiceLineItem> builder)
     {
         builder.ToTable("InvoiceLineItems");
@@ -18,19 +21,19 @@ public sealed class InvoiceLineItemConfiguration : IEntityTypeConfiguration<Invo
             .IsRequired();
 
         builder.Property(lineItem => lineItem.Description)
-            .HasMaxLength(500)
+            .HasMaxLength(InvoiceRules.LineItemDescriptionMaxLength)
             .IsRequired();
 
         builder.Property(lineItem => lineItem.Quantity)
-            .HasPrecision(18, 4)
+            .HasPrecision(AmountPrecision, InvoiceRules.QuantityAndUnitPriceScale)
             .IsRequired();
 
         builder.Property(lineItem => lineItem.UnitPrice)
-            .HasPrecision(18, 4)
+            .HasPrecision(AmountPrecision, InvoiceRules.QuantityAndUnitPriceScale)
             .IsRequired();
 
         builder.Property(lineItem => lineItem.DiscountPercent)
-            .HasPrecision(5, 2)
+            .HasPrecision(DiscountPrecision, InvoiceRules.DiscountPercentScale)
             .IsRequired();
 
         builder.HasIndex(lineItem => lineItem.InvoiceId);

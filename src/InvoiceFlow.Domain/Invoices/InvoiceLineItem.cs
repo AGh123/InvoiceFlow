@@ -58,7 +58,7 @@ public class InvoiceLineItem
     public decimal CalculateGrossAmount() => Quantity * UnitPrice;
 
     public decimal CalculateDiscountAmount() =>
-        CalculateGrossAmount() * DiscountPercent / 100m;
+        CalculateGrossAmount() / 100m * DiscountPercent;
 
     public decimal CalculateLineTotal() =>
         CalculateGrossAmount() - CalculateDiscountAmount();
@@ -74,28 +74,38 @@ public class InvoiceLineItem
             throw new ArgumentException("Description is required.", nameof(description));
         }
 
-        if (quantity <= 0)
+        if (description.Length > InvoiceRules.LineItemDescriptionMaxLength)
+        {
+            throw new ArgumentException(
+                $"Description must be {InvoiceRules.LineItemDescriptionMaxLength} characters or fewer.",
+                nameof(description));
+        }
+
+        if (quantity <= 0 || quantity > InvoiceRules.MaximumQuantity ||
+            decimal.Round(quantity, InvoiceRules.QuantityAndUnitPriceScale) != quantity)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(quantity),
                 quantity,
-                "Quantity must be greater than zero.");
+                $"Quantity must be greater than zero, at most {InvoiceRules.MaximumQuantity}, and have at most {InvoiceRules.QuantityAndUnitPriceScale} decimal places.");
         }
 
-        if (unitPrice < 0)
+        if (unitPrice < 0 || unitPrice > InvoiceRules.MaximumUnitPrice ||
+            decimal.Round(unitPrice, InvoiceRules.QuantityAndUnitPriceScale) != unitPrice)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(unitPrice),
                 unitPrice,
-                "Unit price cannot be negative.");
+                $"Unit price must be between zero and {InvoiceRules.MaximumUnitPrice} with at most {InvoiceRules.QuantityAndUnitPriceScale} decimal places.");
         }
 
-        if (discountPercent is < 0 or > 100)
+        if (discountPercent is < 0 or > InvoiceRules.MaximumDiscountPercent ||
+            decimal.Round(discountPercent, InvoiceRules.DiscountPercentScale) != discountPercent)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(discountPercent),
                 discountPercent,
-                "Discount percent must be between 0 and 100 inclusive.");
+                $"Discount percent must be between 0 and 100 inclusive with at most {InvoiceRules.DiscountPercentScale} decimal places.");
         }
     }
 }

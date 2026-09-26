@@ -1,5 +1,5 @@
 using Bunit;
-using InvoiceFlow.Web.Components.Invoices.Components;
+using InvoiceFlow.Web.Components.Invoices;
 
 namespace InvoiceFlow.Web.Tests.Components.Invoices;
 
@@ -32,7 +32,7 @@ public class InvoiceSummaryTests
             .Add(component => component.ShowDiscount, false));
 
         Assert.DoesNotContain("Discount", cut.Markup);
-        Assert.Equal(2, cut.FindAll(".summary-row").Count);
+        Assert.Equal(2, cut.FindAll(".invoice-summary__row").Count);
         Assert.Equal(2, cut.Markup.Split("$0.00").Length - 1);
     }
 

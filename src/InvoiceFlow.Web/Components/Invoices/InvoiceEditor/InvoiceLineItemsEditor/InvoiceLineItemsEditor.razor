@@ -1,0 +1,194 @@
+@namespace InvoiceFlow.Web.Components.Invoices
+@using InvoiceFlow.Domain.Invoices
+
+<section class="card-surface line-items-editor" aria-labelledby="line-items-heading">
+    <header class="line-items-editor__header">
+        <h2 id="line-items-heading">Line Items</h2>
+        @if (Model.LineItems.Count > 0)
+        {
+            <button type="button"
+                    class="button button--secondary line-items-editor__add-button"
+                    disabled="@Disabled"
+                    @onclick="AddLineItemAsync">
+                <picture aria-hidden="true">
+                    <source media="(max-width: 48rem)" srcset="assets/icons/plus-editor-mobile.svg" />
+                    <img src="assets/icons/plus-editor-desktop.svg" alt="" />
+                </picture>
+                <span class="line-items-editor__desktop-add-label">Add Line Item</span>
+                <span class="line-items-editor__mobile-add-label">Add Item</span>
+            </button>
+        }
+    </header>
+
+    @if (Model.LineItems.Count == 0)
+    {
+        <div class="line-items-editor__empty">
+            <span class="line-items-editor__empty-icon" aria-hidden="true">
+                <img src="assets/icons/plus-editor-desktop.svg" alt="" />
+            </span>
+            <div class="line-items-editor__empty-copy">
+                <h3>No line items yet</h3>
+                <p>Add a line item to start building this invoice.</p>
+            </div>
+            <button type="button"
+                    class="button button--secondary line-items-editor__empty-add-button"
+                    disabled="@Disabled"
+                    @onclick="AddLineItemAsync">
+                <img src="assets/icons/plus-editor-desktop.svg" alt="" aria-hidden="true" />
+                Add Line Item
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="line-items-editor__grid" role="group" aria-label="Editable invoice line items">
+            <div class="line-items-editor__headings" aria-hidden="true">
+                <span>Description <span class="required-indicator">*</span></span>
+                <span class="line-items-editor__heading--quantity">Quantity <span class="required-indicator">*</span></span>
+                <span class="line-items-editor__heading--numeric">Unit Price <span class="required-indicator">*</span></span>
+                <span class="line-items-editor__heading--numeric">Discount</span>
+                <span class="line-items-editor__heading--numeric">Total</span>
+                <span></span>
+            </div>
+
+            @for (var index = 0; index < Model.LineItems.Count; index++)
+            {
+                var lineItem = Model.LineItems[index];
+                var itemNumber = index + 1;
+                var idPrefix = $"line-item-{index}";
+                var hasLineTotal = lineItem.TryCalculateLineTotal(out var lineTotal);
+
+                <fieldset class="line-items-editor__row" @key="lineItem">
+                    <legend class="visually-hidden">Line item @itemNumber</legend>
+
+                    <div class="line-items-editor__field line-items-editor__field--description">
+                        <label for="@($"{idPrefix}-description")">Description <span class="required-indicator" aria-hidden="true">*</span></label>
+                        <InputText class="form-control" id="@($"{idPrefix}-description")"
+                                   maxlength="@InvoiceRules.LineItemDescriptionMaxLength"
+                                   autocomplete="off"
+                                   disabled="@Disabled"
+                                   aria-required="true"
+                                   aria-describedby="@($"{idPrefix}-description-error")"
+                                   placeholder="Enter description…"
+                                   @oninput="args => DescriptionInput(args, lineItem)"
+                                   @bind-Value="lineItem.Description" />
+                        <ValidationMessage id="@($"{idPrefix}-description-error")"
+                                           For="@(() => lineItem.Description)" />
+                    </div>
+
+                    <div class="line-items-editor__field line-items-editor__field--quantity">
+                        <label for="@($"{idPrefix}-quantity")">Quantity <span class="required-indicator" aria-hidden="true">*</span></label>
+                        <InputNumberOnInput TValue="decimal" class="form-control"
+                                            SelectOnFocus="true"
+                                            id="@($"{idPrefix}-quantity")"
+                                            step="any"
+                                            inputmode="decimal"
+                                            disabled="@Disabled"
+                                            aria-required="true"
+                                            aria-describedby="@($"{idPrefix}-quantity-error")"
+                                            @bind-Value="lineItem.Quantity" />
+                        <ValidationMessage id="@($"{idPrefix}-quantity-error")"
+                                           For="@(() => lineItem.Quantity)" />
+                    </div>
+
+                    <div class="line-items-editor__field line-items-editor__field--price">
+                        <label for="@($"{idPrefix}-price")">Unit Price <span class="required-indicator" aria-hidden="true">*</span></label>
+                        <InputNumberOnInput TValue="decimal" class="form-control"
+                                            SelectOnFocus="true"
+                                            id="@($"{idPrefix}-price")"
+                                            min="0"
+                                            step="any"
+                                            inputmode="decimal"
+                                            disabled="@Disabled"
+                                            aria-required="true"
+                                            aria-describedby="@($"{idPrefix}-price-error")"
+                                            @bind-Value="lineItem.UnitPrice" />
+                        <ValidationMessage id="@($"{idPrefix}-price-error")"
+                                           For="@(() => lineItem.UnitPrice)" />
+                    </div>
+
+                    <div class="line-items-editor__field line-items-editor__field--discount">
+                        <label for="@($"{idPrefix}-discount")">Discount %</label>
+                        <InputNumberOnInput TValue="decimal" class="form-control"
+                                            SelectOnFocus="true"
+                                            id="@($"{idPrefix}-discount")"
+                                            min="0"
+                                            max="100"
+                                            step="any"
+                                            inputmode="decimal"
+                                            disabled="@Disabled"
+                                            aria-describedby="@($"{idPrefix}-discount-error")"
+                                            @bind-Value="lineItem.DiscountPercent" />
+                        <ValidationMessage id="@($"{idPrefix}-discount-error")"
+                                           For="@(() => lineItem.DiscountPercent)" />
+                    </div>
+
+                    <div class="line-items-editor__total" aria-live="polite">
+                        <span>Total:</span>
+                        <strong>@(hasLineTotal ? InvoiceCurrencyFormatter.Format(lineTotal, Model.CurrencyCode) : "Unavailable")</strong>
+                    </div>
+
+                    <button type="button"
+                            class="line-items-editor__remove-button"
+                            disabled="@Disabled"
+                            aria-label="@RemoveButtonLabel(lineItem, itemNumber)"
+                            @onclick="() => RemoveLineItemAsync(lineItem)">
+                        <picture aria-hidden="true">
+                            <source media="(max-width: 48rem)" srcset="assets/icons/trash-editor-mobile.svg" />
+                            <img src="assets/icons/trash-editor-desktop.svg" alt="" />
+                        </picture>
+                        <span>Remove</span>
+                    </button>
+                </fieldset>
+            }
+        </div>
+    }
+
+    @{ var totalsAvailable = Model.TryCalculateTotals(out var totals); }
+    <ValidationMessage For="@(() => Model.LineItems)" />
+    <div class="line-items-editor__summary">
+        <InvoiceSummary Subtotal="totals.Subtotal"
+                        TotalDiscount="totals.TotalDiscount"
+                        GrandTotal="totals.GrandTotal"
+                        TotalsAvailable="totalsAvailable"
+                        ShowDiscount="@(Model.LineItems.Count > 0)"
+                        CurrencyCode="@Model.CurrencyCode" />
+    </div>
+</section>
+
+@code {
+    [CascadingParameter]
+    private EditContext? EditContext { get; set; }
+
+    [Parameter, EditorRequired]
+    public InvoiceEditorModel Model { get; set; } = null!;
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public EventCallback StructureChanged { get; set; }
+
+    private async Task AddLineItemAsync()
+    {
+        Model.LineItems.Add(new InvoiceLineItemEditorModel());
+        await StructureChanged.InvokeAsync();
+    }
+
+    private async Task RemoveLineItemAsync(InvoiceLineItemEditorModel lineItem)
+    {
+        Model.LineItems.Remove(lineItem);
+        await StructureChanged.InvokeAsync();
+    }
+
+    private void DescriptionInput(ChangeEventArgs args, InvoiceLineItemEditorModel lineItem)
+    {
+        lineItem.Description = args.Value?.ToString() ?? string.Empty;
+        EditContext?.NotifyFieldChanged(new FieldIdentifier(lineItem, nameof(lineItem.Description)));
+    }
+
+    private static string RemoveButtonLabel(InvoiceLineItemEditorModel lineItem, int itemNumber) =>
+        string.IsNullOrWhiteSpace(lineItem.Description)
+            ? $"Remove line item {itemNumber}"
+            : $"Remove {lineItem.Description}";
+}

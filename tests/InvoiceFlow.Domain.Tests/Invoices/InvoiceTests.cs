@@ -308,6 +308,65 @@ public class InvoiceTests
     }
 
     [Fact]
+    public void CalculateTotals_WithOneMaximumValueLine_RemainsRepresentable()
+    {
+        var invoice = CreateInvoice();
+        var lineItem = invoice.AddLineItem(Guid.NewGuid(), "Maximum",
+            InvoiceRules.MaximumQuantity, InvoiceRules.MaximumUnitPrice, 100m);
+
+        var totals = invoice.CalculateTotals();
+
+        Assert.Equal(lineItem.CalculateGrossAmount(), totals.Subtotal);
+        Assert.Equal(totals.Subtotal, totals.TotalDiscount);
+        Assert.Equal(0m, totals.GrandTotal);
+    }
+
+    [Fact]
+    public void CalculateTotals_WithSevenMaximumValueLines_RemainsRepresentable()
+    {
+        var invoice = CreateInvoice();
+        for (var index = 0; index < 7; index++)
+        {
+            invoice.AddLineItem(Guid.NewGuid(), "Maximum",
+                InvoiceRules.MaximumQuantity, InvoiceRules.MaximumUnitPrice, 0m);
+        }
+
+        var totals = invoice.CalculateTotals();
+
+        Assert.Equal(InvoiceRules.MaximumQuantity * InvoiceRules.MaximumUnitPrice * 7m, totals.Subtotal);
+        Assert.Equal(0m, totals.TotalDiscount);
+        Assert.Equal(totals.Subtotal, totals.GrandTotal);
+    }
+
+    [Fact]
+    public void CalculateTotals_WithEightMaximumValueLines_RejectsAggregateOverflow()
+    {
+        var invoice = CreateInvoice();
+        for (var index = 0; index < 8; index++)
+        {
+            invoice.AddLineItem(Guid.NewGuid(), "Maximum",
+                InvoiceRules.MaximumQuantity, InvoiceRules.MaximumUnitPrice, 0m);
+        }
+
+        var exception = Assert.Throws<ArgumentException>(() => invoice.CalculateTotals());
+
+        Assert.Equal(nameof(Invoice.LineItems), exception.ParamName);
+        Assert.Contains("Invoice totals exceed", exception.Message);
+    }
+
+    [Fact]
+    public void CalculateTotals_PreservesNormalAmounts()
+    {
+        var invoice = CreateInvoice();
+        invoice.AddLineItem(Guid.NewGuid(), "Consulting", 5m, 100m, 10m);
+        invoice.AddLineItem(Guid.NewGuid(), "Support", 2m, 75m, 20m);
+
+        var totals = invoice.CalculateTotals();
+
+        Assert.Equal((650m, 80m, 570m), totals);
+    }
+
+    [Fact]
     public void UpdateDetails_WithValidValues_UpdatesEditableDetails()
     {
         // Arrange
@@ -315,10 +374,10 @@ public class InvoiceTests
         var updatedIssueDate = new DateOnly(2027, 1, 15);
 
         // Act
-        invoice.UpdateDetails("INV-002", "Globex Corp", updatedIssueDate, "gbp");
+        invoice.UpdateDetails("Globex Corp", updatedIssueDate, "gbp");
 
         // Assert
-        Assert.Equal("INV-002", invoice.InvoiceNumber);
+        Assert.Equal("INV-001", invoice.InvoiceNumber);
         Assert.Equal("Globex Corp", invoice.CustomerName);
         Assert.Equal(updatedIssueDate, invoice.IssueDate);
         Assert.Equal("GBP", invoice.CurrencyCode);
@@ -332,7 +391,7 @@ public class InvoiceTests
 
         // Act
         var exception = Assert.Throws<ArgumentException>(() =>
-            invoice.UpdateDetails("INV-002", "Globex Corp", new DateOnly(2027, 1, 15), "US"));
+            invoice.UpdateDetails("Globex Corp", new DateOnly(2027, 1, 15), "US"));
 
         // Assert
         Assert.Equal("currencyCode", exception.ParamName);
@@ -369,4 +428,40 @@ public class InvoiceTests
 
     private static Invoice CreateInvoice() =>
         new(Guid.NewGuid(), "INV-001", "Acme Ltd", DefaultIssueDate, "USD");
+
+    [Fact]
+    public void InvoiceNumber_IsSetOnlyAtCreation()
+    {
+        var invoice = new Invoice(Guid.NewGuid(), "MANUAL-001", "Acme", DefaultIssueDate, "USD");
+
+        invoice.UpdateDetails("Updated", DefaultIssueDate, "EUR");
+
+        Assert.Equal("MANUAL-001", invoice.InvoiceNumber);
+        Assert.DoesNotContain(typeof(Invoice).GetMethods(BindingFlags.Public | BindingFlags.Instance),
+            method => method.GetParameters().Any(parameter => parameter.Name == "invoiceNumber"));
+    }
+
+    [Fact]
+    public void InvoiceNumber_AtMaximumLengthIsAcceptedAndLongerValueIsRejected()
+    {
+        var accepted = new Invoice(Guid.NewGuid(), new string('N', InvoiceRules.InvoiceNumberMaxLength),
+            "Acme", DefaultIssueDate, "USD");
+
+        Assert.Equal(InvoiceRules.InvoiceNumberMaxLength, accepted.InvoiceNumber.Length);
+        Assert.Throws<ArgumentException>(() => new Invoice(Guid.NewGuid(),
+            new string('N', InvoiceRules.InvoiceNumberMaxLength + 1), "Acme", DefaultIssueDate, "USD"));
+    }
+
+    [Fact]
+    public void CustomerName_AtMaximumLengthIsAcceptedAndLongerUpdatePreservesState()
+    {
+        var invoice = new Invoice(Guid.NewGuid(), "INV-001",
+            new string('C', InvoiceRules.CustomerNameMaxLength), DefaultIssueDate, "USD");
+
+        Assert.Throws<ArgumentException>(() => invoice.UpdateDetails(
+            new string('C', InvoiceRules.CustomerNameMaxLength + 1), DefaultIssueDate, "EUR"));
+
+        Assert.Equal(InvoiceRules.CustomerNameMaxLength, invoice.CustomerName.Length);
+        Assert.Equal("USD", invoice.CurrencyCode);
+    }
 }

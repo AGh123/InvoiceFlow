@@ -1,0 +1,183 @@
+@namespace InvoiceFlow.Web.Components.Invoices
+@implements IDisposable
+@using InvoiceFlow.Domain.Invoices
+
+<EditForm EditContext="_editContext"
+          FormName="invoice-editor"
+          @key="_editContext"
+          aria-busy="@IsSaving.ToString().ToLowerInvariant()"
+          novalidate
+          OnSubmit="HandleSubmitAsync">
+    <DataAnnotationsValidator />
+    <p class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+        @(IsSaving ? "Saving invoice." : string.Empty)
+    </p>
+
+    <div class="invoice-editor__mobile-bar">
+        <a class="invoice-editor__mobile-back-link" href="/invoices">
+            <img src="assets/icons/arrow-left-mobile.svg" alt="" aria-hidden="true" />
+            Back
+        </a>
+    </div>
+
+    <div class="invoice-editor__content">
+        @if (_validationErrorCount > 0)
+        {
+            <div class="invoice-editor__validation-alert"
+                 role="alert"
+                 tabindex="-1"
+                 @ref="_validationAlert">
+                <img src="assets/icons/alert-circle.svg" alt="" aria-hidden="true" />
+                <p>@ValidationAlertText</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <StatusMessage Kind="StatusMessageKind.Error"
+                           Message="We couldn't save the invoice."
+                           Detail="@ErrorMessage"
+                           ActionText="Try Again"
+                           OnAction="RetrySaveAsync" />
+        }
+
+        <header class="invoice-editor__heading">
+            <div class="invoice-editor__heading-copy">
+                <a class="invoice-editor__desktop-back-link" href="/invoices">
+                    <img src="assets/icons/arrow-left-desktop.svg" alt="" aria-hidden="true" />
+                    Back to Invoices
+                </a>
+                <div>
+                    <h1>@(IsEditMode ? "Edit Invoice" : "New Invoice")</h1>
+                    <p>@(IsEditMode
+                        ? "Modify invoice details, customer information, or line items."
+                        : "Create a new invoice by filling out the details and items below.")</p>
+                </div>
+            </div>
+
+        </header>
+
+        <section class="card-surface invoice-editor__details-card" aria-labelledby="invoice-details-heading">
+            <h2 id="invoice-details-heading">Invoice Details</h2>
+
+            <div class="invoice-editor__details-grid">
+                <div class="invoice-editor__field invoice-editor__field--number">
+                    <label for="invoice-number">Invoice Number <span class="required-indicator" aria-hidden="true">*</span></label>
+                    @if (IsEditMode)
+                    {
+                        <input class="form-control" id="invoice-number" value="@Model.InvoiceNumber" readonly aria-required="true"
+                               aria-describedby="invoice-number-help" />
+                    }
+                    else
+                    {
+                        <InputText class="form-control" id="invoice-number" maxlength="@InvoiceRules.InvoiceNumberMaxLength" autocomplete="off"
+                                   disabled="@IsSaving" aria-required="true"
+                                   aria-describedby="invoice-number-help invoice-number-error"
+                                   @oninput="HandleInvoiceNumberInput"
+                                   @bind-Value="Model.InvoiceNumber" />
+                    }
+                    <span id="invoice-number-help" class="invoice-editor__field-help">@(IsEditMode
+                        ? "Invoice numbers can't be changed after creation."
+                        : "Generated automatically. You can change it before saving.")</span>
+                    <ValidationMessage id="invoice-number-error"
+                                       For="@(() => Model.InvoiceNumber)" />
+                </div>
+
+                <div class="invoice-editor__field invoice-editor__field--customer">
+                    <label for="customer-name">Customer Name <span class="required-indicator" aria-hidden="true">*</span></label>
+                    <InputText class="form-control" id="customer-name"
+                               maxlength="@InvoiceRules.CustomerNameMaxLength"
+                               autocomplete="organization"
+                               disabled="@IsSaving"
+                               aria-required="true"
+                               placeholder="Enter customer name"
+                               aria-describedby="customer-name-error"
+                               @oninput="HandleCustomerInput"
+                               @bind-Value="Model.CustomerName" />
+                    <ValidationMessage id="customer-name-error"
+                                       For="@(() => Model.CustomerName)" />
+                </div>
+
+                <div class="invoice-editor__field invoice-editor__field--date">
+                    <label id="issue-date-label" for="issue-date">Issue Date <span class="required-indicator" aria-hidden="true">*</span></label>
+                    <DatePicker Id="issue-date" Value="Model.IssueDate" ValueChanged="ChangeDate"
+                                Disabled="IsSaving" LabelId="issue-date-label" DescribedBy="issue-date-error"
+                                Invalid="@HasError(nameof(Model.IssueDate))" />
+                    <ValidationMessage id="issue-date-error"
+                                       For="@(() => Model.IssueDate)" />
+                </div>
+
+                <div class="invoice-editor__field invoice-editor__field--currency">
+                    <label for="currency-code">Currency <span class="required-indicator" aria-hidden="true">*</span></label>
+                    <CurrencyCombobox Value="@Model.CurrencyCode" ValueChanged="ChangeCurrency"
+                                      Disabled="IsSaving" Invalid="@HasError(nameof(Model.CurrencyCode))" />
+                    <span id="currency-code-help" class="invoice-editor__field-help">Use a three-letter currency code.</span>
+                    <ValidationMessage id="currency-code-error"
+                                       For="@(() => Model.CurrencyCode)" />
+                </div>
+            </div>
+        </section>
+
+        <InvoiceLineItemsEditor Model="Model"
+                                Disabled="IsSaving"
+                                StructureChanged="HandleStructureChanged" />
+
+        <section class="card-surface invoice-editor__bottom-actions" aria-label="Invoice actions">
+            <p>@(IsEditMode
+                ? "Review your changes before saving."
+                : "Totals update automatically as you edit line items.")</p>
+            <div class="invoice-editor__final-actions">
+                <button type="button"
+                        class="button button--secondary"
+                        disabled="@IsSaving"
+                        @onclick="OnCancel">
+                    Cancel
+                </button>
+                <button type="submit" class="button button--primary" disabled="@IsSaveDisabled">
+                    @SaveButtonContent()
+                </button>
+            </div>
+        </section>
+
+        @if (IsEditMode)
+        {
+            <section class="card-surface invoice-editor__danger-zone" aria-labelledby="danger-zone-heading">
+                <div class="invoice-editor__danger-copy">
+                    <h2 id="danger-zone-heading">Danger Zone</h2>
+                    <p>Deleting this invoice will permanently remove it and its line items. This action cannot be undone.</p>
+                </div>
+                <div class="invoice-editor__danger-actions">
+                    <p>This is a permanent action.</p>
+                    <button type="button"
+                            class="button button--danger invoice-editor__delete-button"
+                            disabled="@IsSaving"
+                            @onclick="ShowDeleteDialogAsync">
+                        <img src="assets/icons/trash-white.svg" alt="" aria-hidden="true" />
+                        Delete Invoice
+                    </button>
+                </div>
+            </section>
+        }
+    </div>
+</EditForm>
+
+@if (IsEditMode)
+{
+    <InvoiceDeleteDialog @ref="_deleteDialog" InvoiceDeleted="HandleInvoiceDeletedAsync" />
+}
+
+
+@code {
+    private RenderFragment SaveButtonContent() => @<text>
+        @if (IsSaving)
+        {
+            <img class="invoice-editor__saving-icon" src="assets/icons/loader.svg" alt="" aria-hidden="true" />
+            <span>Saving…</span>
+        }
+        else
+        {
+            <span>Save Invoice</span>
+        }
+    </text>;
+
+}

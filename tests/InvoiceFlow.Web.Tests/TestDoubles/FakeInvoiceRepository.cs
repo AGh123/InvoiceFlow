@@ -1,4 +1,7 @@
+using InvoiceFlow.Application.Invoices;
 using InvoiceFlow.Application.Invoices.Abstractions;
+using InvoiceFlow.Application.Invoices.Dtos;
+using InvoiceFlow.Application.Invoices.Requests;
 using InvoiceFlow.Domain.Invoices;
 
 namespace InvoiceFlow.Web.Tests.TestDoubles;
@@ -14,7 +17,7 @@ internal sealed class FakeInvoiceRepository : IInvoiceRepository
     public Task<bool> InvoiceNumberExistsAsync(string invoiceNumber, CancellationToken cancellationToken = default) =>
         Task.FromResult(Invoices.Any(invoice => invoice.InvoiceNumber == invoiceNumber));
 
-    public Func<CancellationToken, Task<IReadOnlyList<Invoice>>>? GetAllHandler { get; set; }
+    public Func<InvoiceListQuery, CancellationToken, Task<InvoiceListResultDto>>? GetPageHandler { get; set; }
 
     public Func<Guid, CancellationToken, Task<Invoice?>>? GetByIdHandler { get; set; }
 
@@ -24,7 +27,7 @@ internal sealed class FakeInvoiceRepository : IInvoiceRepository
 
     public Func<Invoice, CancellationToken, Task>? DeleteHandler { get; set; }
 
-    public int GetAllCallCount { get; private set; }
+    public int GetPageCallCount { get; private set; }
 
     public int GetByIdCallCount { get; private set; }
 
@@ -40,11 +43,34 @@ internal sealed class FakeInvoiceRepository : IInvoiceRepository
 
     public Invoice? LastDeleted { get; private set; }
 
-    public Task<IReadOnlyList<Invoice>> GetAllAsync(CancellationToken cancellationToken = default)
+    public Task<InvoiceListResultDto> GetPageAsync(
+        InvoiceListQuery request, CancellationToken cancellationToken = default)
     {
-        GetAllCallCount++;
-        return GetAllHandler?.Invoke(cancellationToken) ??
-               Task.FromResult<IReadOnlyList<Invoice>>([.. Invoices]);
+        GetPageCallCount++;
+        if (GetPageHandler is not null) return GetPageHandler(request, cancellationToken);
+
+        var query = Invoices.Where(invoice =>
+            invoice.InvoiceNumber.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+            invoice.CustomerName.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase));
+        query = request.Sort switch
+        {
+            InvoiceSortOption.Oldest => query.OrderBy(invoice => invoice.IssueDate)
+                .ThenBy(invoice => invoice.InvoiceNumber, StringComparer.OrdinalIgnoreCase),
+            InvoiceSortOption.Customer => query.OrderBy(invoice => invoice.CustomerName, StringComparer.OrdinalIgnoreCase)
+                .ThenByDescending(invoice => invoice.IssueDate),
+            InvoiceSortOption.InvoiceNumber => query.OrderBy(invoice => invoice.InvoiceNumber, StringComparer.OrdinalIgnoreCase),
+            _ => query.OrderByDescending(invoice => invoice.IssueDate)
+                .ThenBy(invoice => invoice.InvoiceNumber, StringComparer.OrdinalIgnoreCase),
+        };
+        var filtered = query.ToArray();
+        var pageCount = Math.Max(1, (filtered.Length + request.PageSize - 1) / request.PageSize);
+        var page = Math.Clamp(request.Page, 1, pageCount);
+        var summaries = filtered.Skip((page - 1) * request.PageSize).Take(request.PageSize)
+            .Select(invoice => new InvoiceSummaryDto(invoice.Id, invoice.InvoiceNumber,
+                invoice.CustomerName, invoice.IssueDate, invoice.CurrencyCode, invoice.CalculateGrandTotal()))
+            .ToArray();
+        return Task.FromResult(new InvoiceListResultDto(summaries, Invoices.Count, filtered.Length,
+            Invoices.Count == 0 ? null : Invoices.Max(invoice => invoice.IssueDate), page));
     }
 
     public Task<Invoice?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -68,8 +94,15 @@ internal sealed class FakeInvoiceRepository : IInvoiceRepository
         Invoices.Add(invoice);
     }
 
-    public async Task UpdateAsync(Invoice invoice, CancellationToken cancellationToken = default)
+    public async Task<bool> UpdateAsync(Guid id, Action<Invoice> update, CancellationToken cancellationToken = default)
     {
+        var invoice = Invoices.SingleOrDefault(existing => existing.Id == id);
+        if (invoice is null)
+        {
+            return false;
+        }
+
+        update(invoice);
         UpdateCallCount++;
         LastUpdated = invoice;
 
@@ -77,19 +110,28 @@ internal sealed class FakeInvoiceRepository : IInvoiceRepository
         {
             await UpdateHandler(invoice, cancellationToken);
         }
+
+        return true;
     }
 
-    public async Task DeleteAsync(Invoice invoice, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        var invoice = Invoices.SingleOrDefault(existing => existing.Id == id);
+        if (invoice is null)
+        {
+            return false;
+        }
+
         DeleteCallCount++;
         LastDeleted = invoice;
 
         if (DeleteHandler is not null)
         {
             await DeleteHandler(invoice, cancellationToken);
-            return;
+            return true;
         }
 
         Invoices.Remove(invoice);
+        return true;
     }
 }

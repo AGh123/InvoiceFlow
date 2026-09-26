@@ -3,7 +3,7 @@ using InvoiceFlow.Application.Invoices;
 using InvoiceFlow.Application.Invoices.Abstractions;
 using InvoiceFlow.Application.Invoices.Dtos;
 using InvoiceFlow.Domain.Invoices;
-using InvoiceFlow.Web.Components.Invoices.Components;
+using InvoiceFlow.Web.Components.Invoices;
 using InvoiceFlow.Web.Tests.TestDoubles;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +13,7 @@ namespace InvoiceFlow.Web.Tests.Components.Invoices;
 public class InvoiceDeleteDialogTests
 {
     private const string ModulePath =
-        "./Components/Invoices/Components/InvoiceDeleteDialog.razor.js";
+        "./js/dialog.js";
 
     [Fact]
     public async Task Show_RendersInvoiceInformationAndCancelClosesDialog()
@@ -27,7 +27,7 @@ public class InvoiceDeleteDialogTests
 
         Assert.Contains("INV-100", cut.Markup);
         Assert.Contains("Acme Ltd", cut.Markup);
-        cut.Find("button.button-secondary").Click();
+        cut.Find("button.button--secondary").Click();
         module.VerifyInvoke("closeDialog");
     }
 
@@ -44,7 +44,7 @@ public class InvoiceDeleteDialogTests
             .Add(component => component.InvoiceDeleted, deleted.Add));
         await cut.InvokeAsync(() => cut.Instance.ShowAsync(Summary(invoice.Id)));
 
-        cut.Find("button.button-danger").Click();
+        cut.Find("button.button--danger").Click();
 
         Assert.Equal(1, repository.DeleteCallCount);
         Assert.Equal(invoice.Id, Assert.Single(deleted).Id);
@@ -60,7 +60,7 @@ public class InvoiceDeleteDialogTests
         var cut = context.Render<InvoiceDeleteDialog>();
         await cut.InvokeAsync(() => cut.Instance.ShowAsync(Summary()));
 
-        cut.Find("button.button-danger").Click();
+        cut.Find("button.button--danger").Click();
 
         Assert.Contains("We couldn't find this invoice. Refresh the list and try again.", cut.Markup);
     }
@@ -77,7 +77,7 @@ public class InvoiceDeleteDialogTests
         var cut = context.Render<InvoiceDeleteDialog>();
         await cut.InvokeAsync(() => cut.Instance.ShowAsync(Summary(invoice.Id)));
 
-        cut.Find("button.button-danger").Click();
+        cut.Find("button.button--danger").Click();
 
         Assert.Contains("We couldn't delete the invoice. Your list is unchanged. Try again.", cut.Markup);
         Assert.DoesNotContain("database details", cut.Markup);
@@ -96,14 +96,14 @@ public class InvoiceDeleteDialogTests
         var cut = context.Render<InvoiceDeleteDialog>();
         await cut.InvokeAsync(() => cut.Instance.ShowAsync(Summary(invoice.Id)));
 
-        var deleteTask = cut.Find("button.button-danger").ClickAsync(new MouseEventArgs());
+        var deleteTask = cut.Find("button.button--danger").ClickAsync(new MouseEventArgs());
         cut.WaitForAssertion(() =>
         {
             Assert.Equal(1, repository.DeleteCallCount);
-            Assert.True(cut.Find("button.button-danger").HasAttribute("disabled"));
+            Assert.True(cut.Find("button.button--danger").HasAttribute("disabled"));
         });
 
-        cut.Find("button.button-danger").Click();
+        cut.Find("button.button--danger").Click();
         Assert.Equal(1, repository.DeleteCallCount);
         completion.SetResult();
         await deleteTask;

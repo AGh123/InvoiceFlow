@@ -31,11 +31,17 @@ jobs:
       - name: Build
         run: dotnet build InvoiceFlow.slnx --configuration Release --no-restore
 
+      - name: Verify formatting
+        run: dotnet format InvoiceFlow.slnx --verify-no-changes --no-restore --verbosity quiet
+
       - name: Test
         run: dotnet test InvoiceFlow.slnx --configuration Release --no-build
 
       - name: Publish Web application
         run: dotnet publish src/InvoiceFlow.Web/InvoiceFlow.Web.csproj --configuration Release --no-build --output ./artifacts/publish
+
+      - name: Verify published application
+        run: test -f ./artifacts/publish/InvoiceFlow.Web.dll
 
       - name: Upload published Web application
         uses: actions/upload-artifact@v4
@@ -44,3 +50,24 @@ jobs:
           path: ./artifacts/publish
           retention-days: 7
           if-no-files-found: error
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+
+      - name: Install browser test dependencies
+        run: npm ci
+        working-directory: tests/browser
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: tests/browser
+
+      - name: Browser tests
+        run: npm test
+        working-directory: tests/browser
+        env:
+          INVOICEFLOW_PUBLISH_DIR: ${{ github.workspace }}/artifacts/publish

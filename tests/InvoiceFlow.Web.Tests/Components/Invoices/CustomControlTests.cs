@@ -1,5 +1,6 @@
 using Bunit;
-using InvoiceFlow.Web.Components.Invoices.Components;
+using InvoiceFlow.Application.Invoices;
+using InvoiceFlow.Web.Components.Invoices;
 using InvoiceFlow.Web.Components.Shared;
 using Microsoft.AspNetCore.Components.Web;
 
@@ -39,7 +40,7 @@ public class CustomControlTests
             .Add(component => component.ValueChanged, value => selected = value));
 
         cut.Find("#issue-date").Click();
-        cut.Find(".today-action").Click();
+        cut.Find(".date-picker__today").Click();
 
         Assert.Equal(DateOnly.FromDateTime(DateTime.Today), selected);
     }
@@ -77,7 +78,7 @@ public class CustomControlTests
         cut.Find("[aria-label='Friday, September 25, 2026']")
             .KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
         Assert.Equal("0", cut.Find("[aria-label='Saturday, September 26, 2026']").GetAttribute("tabindex"));
-        cut.Find(".calendar-popover").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+        cut.Find(".date-picker__popover").KeyDown(new KeyboardEventArgs { Key = "Escape" });
         Assert.Equal("false", cut.Find("#issue-date").GetAttribute("aria-expanded"));
     }
 
@@ -92,13 +93,13 @@ public class CustomControlTests
 
         cut.Find("#currency-code").Input("eu");
         Assert.Contains("Euro", cut.Markup);
-        cut.Find(".currency-option").Click();
+        cut.Find(".currency-combobox__option").Click();
         Assert.Equal("EUR", selected);
         Assert.Equal("false", cut.Find("#currency-code").GetAttribute("aria-expanded"));
 
         cut.Find("#currency-code").Input("chf");
         Assert.Equal("CHF", selected);
-        Assert.Empty(cut.FindAll(".currency-option"));
+        Assert.Empty(cut.FindAll(".currency-combobox__option"));
     }
 
     [Fact]
@@ -120,21 +121,21 @@ public class CustomControlTests
     }
 
     [Theory]
-    [InlineData("Newest first", "newest")]
-    [InlineData("Oldest first", "oldest")]
-    [InlineData("Customer A–Z", "customer")]
-    [InlineData("Invoice number", "number")]
-    public void SortControl_SelectsEachOption(string label, string expected)
+    [InlineData("Newest first", InvoiceSortOption.Newest)]
+    [InlineData("Oldest first", InvoiceSortOption.Oldest)]
+    [InlineData("Customer A–Z", InvoiceSortOption.Customer)]
+    [InlineData("Invoice number", InvoiceSortOption.InvoiceNumber)]
+    public void SortControl_SelectsEachOption(string label, InvoiceSortOption expected)
     {
         using var context = Context();
-        string selected = "newest";
+        InvoiceSortOption selected = InvoiceSortOption.Newest;
         var cut = context.Render<InvoiceSortControl>(parameters => parameters
             .Add(component => component.Value, selected)
             .Add(component => component.ValueChanged, value => selected = value));
 
         cut.Find("#invoice-sort").Click();
         Assert.Equal("true", cut.Find("#invoice-sort").GetAttribute("aria-expanded"));
-        cut.FindAll(".sort-option").Single(option => option.TextContent.Contains(label)).Click();
+        cut.FindAll(".invoice-sort__option").Single(option => option.TextContent.Contains(label)).Click();
 
         Assert.Equal(expected, selected);
         Assert.Equal("false", cut.Find("#invoice-sort").GetAttribute("aria-expanded"));
@@ -147,11 +148,11 @@ public class CustomControlTests
         var cut = context.Render<InvoiceSortControl>();
 
         cut.Find("#invoice-sort").Click();
-        cut.FindAll(".sort-option")[0].KeyDown(new KeyboardEventArgs { Key = "ArrowDown" });
-        Assert.Equal("0", cut.FindAll(".sort-option")[1].GetAttribute("tabindex"));
+        cut.FindAll(".invoice-sort__option")[0].KeyDown(new KeyboardEventArgs { Key = "ArrowDown" });
+        Assert.Equal("0", cut.FindAll(".invoice-sort__option")[1].GetAttribute("tabindex"));
 
-        cut.FindAll(".sort-option")[1].KeyDown(new KeyboardEventArgs { Key = "ArrowDown" });
-        Assert.Equal("0", cut.FindAll(".sort-option")[2].GetAttribute("tabindex"));
+        cut.FindAll(".invoice-sort__option")[1].KeyDown(new KeyboardEventArgs { Key = "ArrowDown" });
+        Assert.Equal("0", cut.FindAll(".invoice-sort__option")[2].GetAttribute("tabindex"));
     }
 
     private static BunitContext Context()

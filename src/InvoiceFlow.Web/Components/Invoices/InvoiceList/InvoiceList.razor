@@ -1,0 +1,160 @@
+@namespace InvoiceFlow.Web.Components.Invoices
+@using System.Globalization
+@implements IDisposable
+
+@if (Result.TotalCount == 0)
+{
+    <EmptyState Title="No invoices yet"
+                Description="Create your first invoice to start managing your billing."
+                ActionText="Create Invoice"
+                ActionHref="/invoices/new" />
+}
+else
+{
+    var pageCount = GetPageCount(Result.FilteredCount);
+    var currentPage = Result.Page;
+    var pageInvoices = Result.Invoices;
+    var firstItem = Result.FilteredCount == 0 ? 0 : ((currentPage - 1) * PageSize) + 1;
+    var lastItem = Result.FilteredCount == 0 ? 0 : firstItem + pageInvoices.Count - 1;
+
+    <section class="invoice-list__summary-grid" aria-label="Invoice summary">
+        <article class="card-surface invoice-list__summary-card">
+            <div class="invoice-list__summary-label">
+                <picture aria-hidden="true">
+                    <source media="(max-width: 48rem)" srcset="assets/icons/total-invoices-mobile.svg" />
+                    <img src="assets/icons/total-invoices-desktop.svg" alt="" />
+                </picture>
+                <span>Total Invoices</span>
+            </div>
+            <p class="invoice-list__summary-value">@Result.TotalCount</p>
+        </article>
+
+        <article class="card-surface invoice-list__summary-card">
+            <div class="invoice-list__summary-label">
+                <picture aria-hidden="true">
+                    <source media="(max-width: 48rem)" srcset="assets/icons/latest-invoice-mobile.svg" />
+                    <img src="assets/icons/latest-invoice-desktop.svg" alt="" />
+                </picture>
+                <span>Latest Invoice</span>
+            </div>
+            <p class="invoice-list__summary-value invoice-list__summary-value--date">@FormatDate(Result.LatestIssueDate!.Value)</p>
+        </article>
+    </section>
+
+    <section class="card-surface invoice-list__collection" aria-label="Invoices">
+        <div class="invoice-list__controls">
+            <div class="invoice-list__search">
+                <label class="visually-hidden" for="invoice-search">Search invoices</label>
+                <picture aria-hidden="true">
+                    <source media="(max-width: 48rem)" srcset="assets/icons/search-mobile.svg" />
+                    <img src="assets/icons/search-desktop.svg" alt="" />
+                </picture>
+                <input id="invoice-search"
+                       type="search"
+                       placeholder="Search invoices…"
+                       autocomplete="off"
+                       value="@_searchTerm"
+                       @oninput="SearchChangedAsync" />
+            </div>
+
+            <div class="invoice-list__sort">
+                <span id="invoice-sort-label">Sort by:</span>
+                <InvoiceSortControl Value="@_sortOption" ValueChanged="SetSortOptionAsync" />
+            </div>
+        </div>
+
+        @if (Result.FilteredCount == 0)
+        {
+            <div class="invoice-list__no-results">
+                <EmptyState Title="No invoices found"
+                            Description="Try a different invoice number or customer name." />
+            </div>
+        }
+        else
+        {
+            <div class="invoice-list__desktop">
+                <table>
+                    <caption class="visually-hidden">Invoices matching the current search and sort</caption>
+                    <colgroup>
+                        <col class="invoice-list__column invoice-list__column--number" />
+                        <col class="invoice-list__column invoice-list__column--customer" />
+                        <col class="invoice-list__column invoice-list__column--date" />
+                        <col class="invoice-list__column invoice-list__column--amount" />
+                        <col class="invoice-list__column invoice-list__column--actions" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th scope="col">Invoice Number</th>
+                            <th scope="col">Customer</th>
+                            <th scope="col">Issue Date</th>
+                            <th scope="col" class="invoice-list__cell invoice-list__cell--numeric">Amount</th>
+                            <th scope="col" class="invoice-list__cell invoice-list__cell--numeric">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var invoice in pageInvoices)
+                        {
+                            <tr @key="invoice.Id">
+                                <td><a class="invoice-list__link" href="@InvoiceHref(invoice)">@invoice.InvoiceNumber</a></td>
+                                <td class="invoice-list__cell invoice-list__cell--customer">@invoice.CustomerName</td>
+                                <td class="invoice-list__cell invoice-list__cell--muted">@FormatDate(invoice.IssueDate)</td>
+                                <td class="invoice-list__cell invoice-list__cell--amount">@FormatAmount(invoice)</td>
+                                <td class="invoice-list__cell invoice-list__cell--actions">@Actions(invoice, InvoiceListView.Desktop)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <ul class="invoice-list__mobile" aria-label="Invoices matching the current search and sort">
+                @foreach (var invoice in pageInvoices)
+                {
+                    <li class="invoice-list__card" @key="invoice.Id">
+                        <div class="invoice-list__card-header">
+                            <a class="invoice-list__link" href="@InvoiceHref(invoice)">@invoice.InvoiceNumber</a>
+                            @Actions(invoice, InvoiceListView.Mobile)
+                        </div>
+                        <p class="invoice-list__card-customer">@invoice.CustomerName</p>
+                        <div class="invoice-list__card-meta">
+                            <time datetime="@invoice.IssueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">
+                                @FormatDate(invoice.IssueDate)
+                            </time>
+                            <span class="invoice-list__card-amount">@FormatAmount(invoice)</span>
+                        </div>
+                    </li>
+                }
+            </ul>
+
+            <nav class="invoice-list__pagination" aria-label="Invoice list pagination">
+                <p>Showing @firstItem–@lastItem of @Result.FilteredCount invoices</p>
+                <div class="invoice-list__pagination-buttons">
+                    <button type="button"
+                            class="button button--secondary"
+                            disabled="@(currentPage == 1)"
+                            @onclick="PreviousPageAsync">
+                        Previous
+                    </button>
+                    <button type="button"
+                            class="button button--secondary"
+                            disabled="@(currentPage == pageCount)"
+                            @onclick="NextPageAsync">
+                        Next
+                    </button>
+                </div>
+            </nav>
+        }
+    </section>
+}
+
+<InvoiceDeleteDialog @ref="_deleteDialog" InvoiceDeleted="HandleInvoiceDeletedAsync" />
+
+
+@code {
+    private RenderFragment Actions(InvoiceSummaryDto invoice, InvoiceListView view) => @<text>
+        <InvoiceActionsMenu Invoice="invoice" Open="@(_openMenuKey == (view, invoice.Id))"
+                            OnToggle="() => OpenMenu(view, invoice.Id)"
+                            OnClose="() => CloseMenu(view, invoice.Id)"
+                            OnDelete="ShowDeleteDialogAsync" />
+    </text>;
+
+}

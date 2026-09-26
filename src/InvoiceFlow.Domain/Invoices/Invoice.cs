@@ -26,7 +26,9 @@ public class Invoice
         }
 
         Id = id;
-        UpdateDetails(invoiceNumber, customerName, issueDate, currencyCode);
+        ValidateRequired(invoiceNumber, nameof(invoiceNumber), "Invoice number", InvoiceRules.InvoiceNumberMaxLength);
+        InvoiceNumber = invoiceNumber;
+        UpdateDetails(customerName, issueDate, currencyCode);
     }
 
     public Guid Id { get; private set; }
@@ -42,16 +44,13 @@ public class Invoice
     public IReadOnlyList<InvoiceLineItem> LineItems => _readOnlyLineItems;
 
     public void UpdateDetails(
-        string invoiceNumber,
         string customerName,
         DateOnly issueDate,
         string currencyCode)
     {
-        ValidateRequired(invoiceNumber, nameof(invoiceNumber), "Invoice number");
-        ValidateRequired(customerName, nameof(customerName), "Customer name");
+        ValidateRequired(customerName, nameof(customerName), "Customer name", InvoiceRules.CustomerNameMaxLength);
         var normalizedCurrencyCode = ValidateAndNormalizeCurrencyCode(currencyCode);
 
-        InvoiceNumber = invoiceNumber;
         CustomerName = customerName;
         IssueDate = issueDate;
         CurrencyCode = normalizedCurrencyCode;
@@ -91,27 +90,54 @@ public class Invoice
         return lineItem is not null && _lineItems.Remove(lineItem);
     }
 
-    public decimal CalculateSubtotal() =>
-        _lineItems.Sum(lineItem => lineItem.CalculateGrossAmount());
+    public (decimal Subtotal, decimal TotalDiscount, decimal GrandTotal) CalculateTotals()
+    {
+        try
+        {
+            var subtotal = 0m;
+            var totalDiscount = 0m;
+            var grandTotal = 0m;
 
-    public decimal CalculateTotalDiscount() =>
-        _lineItems.Sum(lineItem => lineItem.CalculateDiscountAmount());
+            foreach (var lineItem in _lineItems)
+            {
+                subtotal += lineItem.CalculateGrossAmount();
+                totalDiscount += lineItem.CalculateDiscountAmount();
+                grandTotal += lineItem.CalculateLineTotal();
+            }
 
-    public decimal CalculateGrandTotal() =>
-        _lineItems.Sum(lineItem => lineItem.CalculateLineTotal());
+            return (subtotal, totalDiscount, grandTotal);
+        }
+        catch (OverflowException exception)
+        {
+            throw new ArgumentException(
+                "Invoice totals exceed the representable decimal range.",
+                nameof(LineItems), exception);
+        }
+    }
 
-    private static void ValidateRequired(string value, string parameterName, string displayName)
+    public decimal CalculateSubtotal() => CalculateTotals().Subtotal;
+
+    public decimal CalculateTotalDiscount() => CalculateTotals().TotalDiscount;
+
+    public decimal CalculateGrandTotal() => CalculateTotals().GrandTotal;
+
+    private static void ValidateRequired(string value, string parameterName, string displayName, int maximumLength)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new ArgumentException($"{displayName} is required.", parameterName);
+        }
+
+        if (value.Length > maximumLength)
+        {
+            throw new ArgumentException($"{displayName} must be {maximumLength} characters or fewer.", parameterName);
         }
     }
 
     private static string ValidateAndNormalizeCurrencyCode(string currencyCode)
     {
         if (string.IsNullOrWhiteSpace(currencyCode) ||
-            currencyCode.Length != 3 ||
+            currencyCode.Length != InvoiceRules.CurrencyCodeLength ||
             !currencyCode.All(char.IsAsciiLetter))
         {
             throw new ArgumentException(

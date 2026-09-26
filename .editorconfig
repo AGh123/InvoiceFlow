@@ -24,3 +24,29 @@ indent_size = 2
 [*.razor]
 indent_style = space
 indent_size = 4
+
+# Behavior-oriented test names deliberately use underscores.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1859.severity = none
+
+# Blazor components have no finalizers; adding SuppressFinalize to each disposer adds ceremony.
+[src/InvoiceFlow.Web/Components/**/*.razor.cs]
+dotnet_diagnostic.CA1816.severity = none
+
+# Shared is the established, conventional UI namespace.
+[src/InvoiceFlow.Web/Components/Shared/DatePicker/DatePicker.razor.cs]
+dotnet_diagnostic.CA1716.severity = none
+
+[tests/InvoiceFlow.Web.Tests/Components/Shared/StatusMessageTests.cs]
+dotnet_diagnostic.CA1716.severity = none
+
+# These components log only exceptional load, save, and delete failures.
+[src/InvoiceFlow.Web/Components/Pages/Invoices/InvoiceListPage/InvoiceListPage.razor.cs]
+dotnet_diagnostic.CA1848.severity = none
+
+[src/InvoiceFlow.Web/Components/Pages/Invoices/InvoiceEditorPage/InvoiceEditorPage.razor.cs]
+dotnet_diagnostic.CA1848.severity = none
+
+[src/InvoiceFlow.Web/Components/Invoices/InvoiceDeleteDialog/InvoiceDeleteDialog.razor.cs]
+dotnet_diagnostic.CA1848.severity = none

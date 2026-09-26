@@ -1,0 +1,47 @@
+@namespace InvoiceFlow.Web.Components.Invoices
+
+<dl class="invoice-summary" aria-label="Invoice totals">
+    <div class="invoice-summary__row">
+        <dt>Subtotal</dt>
+        <dd>@(TotalsAvailable ? FormatAmount(Subtotal) : "Unavailable")</dd>
+    </div>
+
+    @if (ShowDiscount)
+    {
+        <div class="invoice-summary__row invoice-summary__row--discount">
+            <dt>Discount</dt>
+            <dd>@(TotalsAvailable ? FormatDiscount(TotalDiscount) : "Unavailable")</dd>
+        </div>
+    }
+
+    <div class="invoice-summary__row invoice-summary__row--total">
+        <dt>Total</dt>
+        <dd>@(TotalsAvailable ? FormatAmount(GrandTotal) : "Unavailable")</dd>
+    </div>
+</dl>
+
+@code {
+    [Parameter]
+    public decimal Subtotal { get; set; }
+
+    [Parameter]
+    public decimal TotalDiscount { get; set; }
+
+    [Parameter]
+    public decimal GrandTotal { get; set; }
+
+    [Parameter]
+    public bool TotalsAvailable { get; set; } = true;
+
+    [Parameter]
+    public bool ShowDiscount { get; set; } = true;
+
+    [Parameter]
+    public string CurrencyCode { get; set; } = "USD";
+
+    private string FormatAmount(decimal amount) => InvoiceCurrencyFormatter.Format(amount, CurrencyCode);
+
+    private string FormatDiscount(decimal amount) =>
+        amount == 0m ? FormatAmount(0m) : $"-{FormatAmount(amount)}";
+
+}

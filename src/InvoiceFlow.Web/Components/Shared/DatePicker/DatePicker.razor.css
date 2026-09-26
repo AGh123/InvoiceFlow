@@ -1,0 +1,20 @@
+.date-picker { position: relative; min-width: 0; }
+.date-picker__trigger { align-items: center; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); display: flex; height: 2.625rem; justify-content: space-between; padding: 0 .75rem; width: 100%; }
+.date-picker__trigger:focus-visible { border-color: var(--color-focus); }
+.date-picker__trigger:disabled { background: var(--color-background); cursor: not-allowed; }
+.date-picker__trigger.invalid { border-color: var(--color-danger); }
+.date-picker__trigger img { width: 1rem; }
+.date-picker__trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.date-picker__popover { border-radius: var(--radius-card); left: 0; max-width: calc(100vw - 2rem); padding: var(--space-3); position: absolute; top: calc(100% + .375rem); width: 19rem; z-index: 30; }
+.date-picker__header { align-items: center; display: flex; justify-content: space-between; margin-bottom: var(--space-2); }
+.date-picker__header strong { font-size: .875rem; }
+.date-picker__header button { background: transparent; border: 0; border-radius: var(--radius-icon); color: var(--color-text); font-size: 1.4rem; height: 2.75rem; width: 2.75rem; }
+.date-picker__header button:hover, .date-picker__day:hover, .date-picker__today:hover { background: var(--color-primary-soft); }
+.date-picker__row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.date-picker__row span { color: var(--color-text-muted); font-size: .6875rem; padding: .4rem 0; text-align: center; }
+.date-picker__day { background: transparent; border: 1px solid transparent; border-radius: var(--radius-icon); color: var(--color-text); font-size: .8125rem; height: 2.25rem; padding: 0; }
+.date-picker__day--adjacent { color: var(--color-text-muted); opacity: .65; }
+.date-picker__day--today { border-color: var(--color-primary); }
+.date-picker__day--selected { background: var(--color-primary); color: var(--color-on-primary); font-weight: 700; }
+.date-picker__today { background: transparent; border: 0; border-radius: var(--radius-control); color: var(--color-primary); font-size: .8125rem; font-weight: 600; margin-top: var(--space-2); min-height: 2.75rem; width: 100%; }
+@media (max-width: 48rem) { .date-picker__trigger { font-size: .8125rem; gap: .25rem; height: 2.75rem; padding-inline: .5rem; } }

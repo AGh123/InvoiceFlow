@@ -1,6 +1,6 @@
 using InvoiceFlow.Application.Invoices;
-using InvoiceFlow.Application.Invoices.Requests;
 using InvoiceFlow.Application.Invoices.Exceptions;
+using InvoiceFlow.Application.Invoices.Requests;
 using InvoiceFlow.Application.Tests.Fakes;
 using InvoiceFlow.Domain.Invoices;
 
@@ -72,6 +72,45 @@ public class InvoiceServiceTests
     }
 
     [Fact]
+    public async Task Create_WithAggregateOverflow_RejectsBeforeRepositoryAdd()
+    {
+        var repository = new FakeInvoiceRepository();
+        var service = new InvoiceService(repository);
+        var items = Enumerable.Range(0, 8)
+            .Select(_ => new InvoiceLineItemInput(null, "Maximum",
+                InvoiceRules.MaximumQuantity, InvoiceRules.MaximumUnitPrice, 0m))
+            .ToArray();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateInvoiceAsync(
+            new CreateInvoiceRequest("INV-TOO-LARGE", "Acme", DefaultIssueDate, "USD", items)));
+
+        Assert.Equal(0, repository.AddCallCount);
+        Assert.Empty(repository.Invoices);
+    }
+
+    [Fact]
+    public async Task Update_WithAggregateOverflow_PreservesEarlierDetailsAndItems()
+    {
+        var repository = new FakeInvoiceRepository();
+        var invoice = CreateInvoice();
+        invoice.AddLineItem(Guid.NewGuid(), "Original", 1m, 10m, 0m);
+        repository.Seed(invoice);
+        var service = new InvoiceService(repository);
+        var items = Enumerable.Range(0, 8)
+            .Select(_ => new InvoiceLineItemInput(null, "Maximum",
+                InvoiceRules.MaximumQuantity, InvoiceRules.MaximumUnitPrice, 0m))
+            .ToArray();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateInvoiceAsync(invoice.Id,
+            new UpdateInvoiceRequest("Changed", DefaultIssueDate, "EUR", items)));
+
+        Assert.Equal(0, repository.UpdateCallCount);
+        Assert.Equal("Acme Ltd", invoice.CustomerName);
+        Assert.Equal("USD", invoice.CurrencyCode);
+        Assert.Equal("Original", Assert.Single(invoice.LineItems).Description);
+    }
+
+    [Fact]
     public async Task GetInvoicesAsync_MapsInvoicesToSummaries()
     {
         // Arrange
@@ -83,11 +122,12 @@ public class InvoiceServiceTests
         var service = new InvoiceService(repository);
 
         // Act
-        var summaries = await service.GetInvoicesAsync();
+        var result = await service.GetInvoicesAsync(
+            new InvoiceListQuery(string.Empty, InvoiceSortOption.Newest, 1, 10));
 
         // Assert
         Assert.Collection(
-            summaries,
+            result.Invoices,
             summary =>
             {
                 Assert.Equal(firstInvoice.Id, summary.Id);
@@ -117,10 +157,11 @@ public class InvoiceServiceTests
         var service = new InvoiceService(repository);
 
         // Act
-        var summaries = await service.GetInvoicesAsync();
+        var result = await service.GetInvoicesAsync(
+            new InvoiceListQuery(string.Empty, InvoiceSortOption.Newest, 1, 10));
 
         // Assert
-        var summary = Assert.Single(summaries);
+        var summary = Assert.Single(result.Invoices);
         Assert.Equal(450m, summary.GrandTotal);
     }
 
@@ -308,6 +349,7 @@ public class InvoiceServiceTests
         Assert.Equal(new DateOnly(2027, 1, 15), invoice.IssueDate);
         Assert.Equal("EUR", invoice.CurrencyCode);
         Assert.Equal(1, repository.UpdateCallCount);
+        Assert.Equal(0, repository.GetByIdCallCount);
     }
 
     [Fact]
@@ -535,6 +577,7 @@ public class InvoiceServiceTests
         // Assert
         Assert.True(deleted);
         Assert.Equal(1, repository.DeleteCallCount);
+        Assert.Equal(0, repository.GetByIdCallCount);
         Assert.Empty(repository.Invoices);
     }
 
@@ -551,6 +594,19 @@ public class InvoiceServiceTests
         // Assert
         Assert.False(deleted);
         Assert.Equal(0, repository.DeleteCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteInvoiceAsync_WithUnexpectedPersistenceFailure_PropagatesError()
+    {
+        var failure = new InvalidOperationException("Persistence failed");
+        var repository = new FakeInvoiceRepository { DeleteFailure = failure };
+        var service = new InvoiceService(repository);
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.DeleteInvoiceAsync(Guid.NewGuid()));
+
+        Assert.Same(failure, actual);
     }
 
     private static Invoice CreateInvoice(
